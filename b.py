@@ -3,17 +3,17 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from io import BytesIO
-from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_CENTER
 import tempfile
 import os
 
 # -------------------------------------------------
-# 1. AUTHENTICATION SYSTEM
+# 1. AUTHENTICATION & SESSION MANAGEMENT
 # -------------------------------------------------
 def check_password():
     """Returns True if the user had the correct password."""
@@ -26,7 +26,7 @@ def check_password():
         else:
             st.session_state["password_correct"] = False
 
-    if "password_correct" not in st.session_state:
+    if "password_correct" not in st.session_state or not st.session_state["password_correct"]:
         st.markdown("""
             <style>
             .stApp { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
@@ -39,213 +39,221 @@ def check_password():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             st.markdown("<div class='login-box'>", unsafe_allow_html=True)
-            st.title("🔐 Risk Portal Login")
+            st.title("🛡️ Risk Portal Login")
             st.text_input("Username", key="username")
             st.text_input("Password", type="password", key="password")
             st.button("Sign In", on_click=password_entered, use_container_width=True)
             if "password_correct" in st.session_state and not st.session_state["password_correct"]:
-                st.error("😕 Invalid username or password")
+                st.error("⚠️ Invalid username or password")
             st.markdown("</div>", unsafe_allow_html=True)
         return False
-    return st.session_state["password_correct"]
+    return True
 
 # -------------------------------------------------
-# 2. MAIN APPLICATION (REPLICATED FROM YOUR FILE)
+# 2. UTILITIES & PDF LOGIC
+# -------------------------------------------------
+def fmt_pct(x): return f"{x:.2%}" if pd.notna(x) else "NA"
+def fmt_num(x): return f"{x:.2f}" if pd.notna(x) else "NA"
+
+def get_metric_explanations():
+    return [
+        ["Metric", "Definition", "Importance"],
+        ["Loan Status", "Current state of the loan (Active or Settled).", "Determines if the account requires monitoring."],
+        ["Delinquency Density", "Percentage of active months where DPD > 0.", "Indicates the frequency of repayment failure."],
+        ["Maximum DPD", "The highest number of days past due recorded.", "Critical for risk tiering and provisioning."],
+        ["Sticky DPD Bucket", "Categorizes the loan based on peak delinquency.", "Helps identify high-risk assets (e.g., 90+ DPD)."],
+        ["Delinquency Episodes", "Number of times a loan entered a delinquent state.", "Shows if defaults are isolated or recurring."]
+    ]
+
+def create_pdf_chart(df):
+    """Generates an optimized chart for the PDF with months and peak highlights."""
+    # Filter to show only relevant months (Active/Settled)
+    plot_df = df[df["Status"] != "Not Disbursed"].reset_index()
+    
+    fig, ax = plt.subplots(figsize=(6.5, 3), dpi=150)
+    ax.set_facecolor('#f8f9fa')
+    
+    # Plotting DPD and Moving Average
+    ax.plot(plot_df.index, plot_df["DPD"], marker="o", color="#667eea", linewidth=2, label="DPD", markersize=4)
+    ax.plot(plot_df.index, plot_df["Rolling_3M"], linestyle="--", color="#764ba2", alpha=0.7, label="3M Avg")
+    
+    # Highlight Peak DPD
+    if not plot_df.empty and plot_df["DPD"].max() > 0:
+        peak_idx = plot_df["DPD"].idxmax()
+        peak_val = plot_df["DPD"].max()
+        ax.scatter(peak_idx, peak_val, color='red', s=50, zorder=5)
+        ax.annotate(f'Peak: {int(peak_val)}', xy=(peak_idx, peak_val), xytext=(5, 5),
+                    textcoords='offset points', fontsize=8, fontweight='bold', color='#dc2626')
+
+    # Formatting Axis
+    ax.set_xticks(range(len(plot_df)))
+    ax.set_xticklabels(plot_df["Month"], rotation=45, fontsize=7)
+    ax.set_ylabel("Days Past Due", fontsize=8)
+    ax.grid(True, linestyle=':', alpha=0.4)
+    ax.legend(prop={'size': 7}, loc='upper left')
+    
+    plt.tight_layout()
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.png')
+    plt.savefig(tmp.name, bbox_inches='tight', dpi=150)
+    plt.close(fig)
+    return tmp.name
+
+def generate_report_content(code, loan_data, df, metrics_df, story, styles):
+    """Appends report pages to the story list for PDF generation."""
+    title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=18, textColor=colors.HexColor('#667eea'), alignment=TA_CENTER)
+    story.append(Paragraph(f"Loan Delinquency Report: {code}", title_style))
+    story.append(Spacer(1, 12))
+
+    # Exposure Table
+    exposure_data = [['Sanctioned Limit', f"{loan_data.iloc[1]:,.0f}"], ['Outstanding Balance', f"{loan_data.iloc[2]:,.0f}"]]
+    et = Table(exposure_data, colWidths=[2.5*inch, 1.8*inch])
+    et.setStyle(TableStyle([('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#667eea')), ('TEXTCOLOR', (0, 0), (0, -1), colors.white), ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0'))]))
+    story.append(Paragraph("Loan Exposure", styles['Heading2']))
+    story.append(et)
+    story.append(Spacer(1, 12))
+
+    # Metrics Table
+    m_data = [[m['Metric'], m['Value']] for _, m in metrics_df.iterrows()]
+    mt = Table(m_data, colWidths=[2.2*inch, 2.2*inch])
+    mt.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('FONTSIZE', (0,0), (-1,-1), 8), ('BACKGROUND', (0,0), (0,-1), colors.HexColor('#f7fafc'))]))
+    story.append(Paragraph("Key Metrics", styles['Heading2']))
+    story.append(mt)
+    story.append(Spacer(1, 15))
+
+    # Chart
+    chart_path = create_pdf_chart(df)
+    story.append(Image(chart_path, width=5.5*inch, height=2.3*inch))
+    return story
+
+# -------------------------------------------------
+# 3. CORE ANALYTICS LOGIC
+# -------------------------------------------------
+def analyze_loan(row, months):
+    dpd = row[months].astype(object)
+    first_valid_idx = dpd.first_valid_index()
+    if first_valid_idx is None:
+        df = pd.DataFrame({"Month": months.astype(str), "DPD": [0.0]*len(months), "Status": ["Not Disbursed"]*len(months)})
+        return df, pd.DataFrame([("Status", "Not Disbursed", "N/A")], columns=["Metric", "Value", "Interpretation"])
+
+    last_valid_idx = dpd.last_valid_index()
+    first_valid_pos = months.get_loc(first_valid_idx)
+    last_valid_pos = months.get_loc(last_valid_idx)
+    is_settled = last_valid_pos < len(months) - 1
+    
+    active_dpd = dpd.iloc[first_valid_pos:last_valid_pos+1].fillna(0).astype(float)
+    status = ["Not Disbursed"]*first_valid_pos + ["Active"]*(last_valid_pos - first_valid_pos + 1) + ["Settled"]*(len(months) - 1 - last_valid_pos)
+    
+    df = pd.DataFrame({"Month": months.astype(str), "DPD": dpd.fillna(0).astype(float).values, "Status": status})
+    df["Rolling_3M"] = df["DPD"].rolling(3).mean()
+
+    total_months = len(active_dpd)
+    delinquent_months = (active_dpd > 0).sum()
+    max_dpd = active_dpd.max()
+    
+    metrics = [
+        ("Loan Status", f"Settled" if is_settled else "Active", "State"),
+        ("Active Period", f"{total_months} months", "Duration"),
+        ("Delinquency Density", fmt_pct(delinquent_months/total_months), "Frequency"),
+        ("Maximum DPD", f"{int(max_dpd)} days", "Peak"),
+        ("Sticky DPD Bucket", "90+" if max_dpd >= 90 else "30-89" if max_dpd >= 30 else "0-29", "Risk"),
+        ("Current DPD", f"{int(active_dpd.iloc[-1])} days", "Latest")
+    ]
+    return df, pd.DataFrame(metrics, columns=["Metric", "Value", "Interpretation"])
+
+# -------------------------------------------------
+# 4. MAIN APPLICATION
 # -------------------------------------------------
 if check_password():
-    # Page Config (Must be first Streamlit command)
-    st.set_page_config(page_title="Loan Delinquency Dashboard", layout="wide")
+    st.set_page_config(page_title="Loan Risk Dashboard", layout="wide")
 
-    # Replicating your Professional CSS Theme Exactly
+    # Custom Professional CSS
     st.markdown("""
     <style>
         .stApp { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        .block-container { padding-top: 2rem; padding-bottom: 2rem; background-color: rgba(255, 255, 255, 0.95); border-radius: 15px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1); }
-        section[data-testid="stSidebar"] { background: linear-gradient(180deg, #667eea 0%, #764ba2 100%); }
-        section[data-testid="stSidebar"] > div { background-color: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
-        h1 { color: #2d3748; font-weight: 700; font-size: 2.5rem; margin-bottom: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        h2 { color: #4a5568; font-weight: 600; font-size: 1.5rem; margin-top: 2rem; margin-bottom: 1rem; border-left: 4px solid #667eea; padding-left: 12px; }
-        div[data-testid="metric-container"] { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 20px; border-radius: 12px; }
-        div[data-testid="metric-container"] > label { color: rgba(255, 255, 255, 0.9) !important; font-weight: 600; }
-        div[data-testid="metric-container"] > div { color: white !important; font-weight: 700; }
-        .stDownloadButton > button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-weight: 600; border-radius: 8px; border: none; padding: 12px 24px; }
+        .block-container { background-color: rgba(255, 255, 255, 0.98); border-radius: 15px; padding: 2rem; margin-top: 1rem; }
+        h1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; }
+        .metric-card { background: white; padding: 1.2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #667eea; }
     </style>
     """, unsafe_allow_html=True)
 
-    # --- FORMATTERS ---
-    def fmt_pct(x): return f"{x:.2%}" if pd.notna(x) else "NA"
-    def fmt_num(x): return f"{x:.2f}" if pd.notna(x) else "NA"
-
-    # --- PDF GENERATION (Exact Replication) ---
-    def generate_pdf(code, loan_data, df, metrics_df):
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.4*inch, bottomMargin=0.4*inch, leftMargin=0.5*inch, rightMargin=0.5*inch)
-        story = []
-        styles = getSampleStyleSheet()
-        
-        title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=22, textColor=colors.HexColor('#667eea'), alignment=TA_CENTER)
-        story.append(Paragraph("Loan Delinquency Analysis Report", title_style))
-        story.append(Paragraph(f"<font color='#764ba2'><b>Loan Code: {code}</b></font>", ParagraphStyle('CS', parent=styles['Normal'], alignment=TA_CENTER)))
-        story.append(Spacer(1, 12))
-
-        # Exposure Table
-        exposure_data = [['Sanctioned Limit', f"{loan_data.iloc[1]:,.0f}"], ['Outstanding Balance', f"{loan_data.iloc[2]:,.0f}"]]
-        et = Table(exposure_data, colWidths=[2.5*inch, 1.8*inch])
-        et.setStyle(TableStyle([('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#667eea')), ('TEXTCOLOR', (0, 0), (0, -1), colors.white), ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#e2e8f0'))]))
-        story.append(Paragraph("Loan Exposure", styles['Heading2']))
-        story.append(et)
-        story.append(Spacer(1, 12))
-
-        # Metrics Side-by-Side Table
-        story.append(Paragraph("Delinquency Metrics", styles['Heading2']))
-        left_metrics, right_metrics = [], []
-        for i, (_, row) in enumerate(metrics_df.iterrows()):
-            m_data = [row['Metric'], str(row['Value'])]
-            if i < len(metrics_df) // 2 + 1: left_metrics.append(m_data)
-            else: right_metrics.append(m_data)
-        
-        lt = Table(left_metrics, colWidths=[1.5*inch, 1.2*inch])
-        rt = Table(right_metrics, colWidths=[1.5*inch, 1.2*inch])
-        for t in [lt, rt]: t.setStyle(TableStyle([('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f7fafc')), ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')), ('FONTSIZE', (0,0), (-1,-1), 8)]))
-        
-        story.append(Table([[lt, rt]], colWidths=[2.7*inch, 2.7*inch]))
-        story.append(Spacer(1, 12))
-
-        # Chart (Exact Matplotlib Replication for PDF)
-        fig, ax = plt.subplots(figsize=(6.5, 2.8), facecolor='white', dpi=150)
-        ax.set_facecolor('#f8f9fa')
-        
-        not_disbursed_mask = df["Status"] == "Not Disbursed"
-        settled_mask = df["Status"] == "Settled"
-        if not_disbursed_mask.any(): ax.axvspan(-0.5, not_disbursed_mask.sum() - 0.5, alpha=0.1, color='gray')
-        if settled_mask.any(): ax.axvspan(df[settled_mask].index[0] - 0.5, len(df) - 0.5, alpha=0.1, color='green')
-        
-        dpd_plot = df[df["Status"] != "Not Disbursed"]
-        if not dpd_plot.empty:
-            ax.plot(dpd_plot.index, dpd_plot["DPD"], marker="o", color="#667eea", linewidth=2.5, label="DPD")
-            ax.plot(dpd_plot.index, dpd_plot["Rolling_3M"], linestyle="--", color="#764ba2", label="3M Avg")
-        
-        for val, col in zip([30, 60, 90], ["#fbbf24", "#f97316", "#dc2626"]):
-            ax.axhline(val, linestyle=":", alpha=0.4, color=col)
-
-        plt.tight_layout()
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
-            plt.savefig(tmp.name, bbox_inches='tight', dpi=150)
-            story.append(Image(tmp.name, width=6*inch, height=2.5*inch))
-        
-        doc.build(story)
-        buffer.seek(0)
-        return buffer
-
-    # --- CORE CALCULATION (Exact Replication of 17 Metrics) ---
-    def analyze_loan(row, months):
-        dpd = row[months].astype(object)
-        first_valid_idx = dpd.first_valid_index()
-        if first_valid_idx is None:
-            df = pd.DataFrame({"Month": months.astype(str), "DPD": [np.nan]*len(months), "Status": ["Not Disbursed"]*len(months)})
-            return df, pd.DataFrame([("Status", "Not Disbursed", "N/A")], columns=["Metric", "Value", "Interpretation"])
-
-        last_valid_idx = dpd.last_valid_index()
-        first_valid_pos = months.get_loc(first_valid_idx)
-        last_valid_pos = months.get_loc(last_valid_idx)
-        is_settled = last_valid_pos < len(months) - 1
-        active_months = months[first_valid_pos:last_valid_pos + 1]
-        active_dpd = dpd[active_months].fillna(0).astype(float)
-        
-        status = ["Not Disbursed"]*first_valid_pos + ["Active"]*(last_valid_pos - first_valid_pos + 1) + ["Settled"]*(len(months) - 1 - last_valid_pos)
-        df = pd.DataFrame({"Month": months.astype(str), "DPD": dpd.fillna(0).astype(float).values, "Status": status})
-        df["Rolling_3M"] = df["DPD"].rolling(3).mean()
-
-        # Metrics logic from your file
-        total_months = len(active_dpd)
-        delinquent_months = (active_dpd > 0).sum()
-        max_dpd = active_dpd.max()
-        current_dpd = active_dpd.iloc[-1]
-        
-        episodes = cures = 0
-        in_delinquency = False
-        for val in active_dpd:
-            if val > 0:
-                if not in_delinquency: episodes += 1; in_delinquency = True
-            else:
-                if in_delinquency: cures += 1; in_delinquency = False
-
-        metrics = [
-            ("Loan Status", f"Settled ({months[last_valid_pos]})" if is_settled else "Active", "State"),
-            ("Disbursement Month", str(months[first_valid_pos]), "Start"),
-            ("Active Period", f"{total_months} months", "Duration"),
-            ("Delinquency Density", fmt_pct(delinquent_months/total_months), "Density"),
-            ("LTD Cumulative DPD", f"{int(active_dpd.sum())} days", "Total Days"),
-            ("Average DPD (All Months)", f"{fmt_num(active_dpd.mean())} days", "Mean"),
-            ("Maximum DPD", f"{int(max_dpd)} days", "Peak"),
-            ("Current DPD", f"{int(current_dpd)} days", "Latest"),
-            ("Delinquency Episodes", f"{int(episodes)} episodes", "Cycles"),
-            ("Sticky DPD Bucket", "90+" if max_dpd >= 90 else "30-89" if max_dpd >= 30 else "0-29", "Risk Tier")
-        ]
-        return df, pd.DataFrame(metrics, columns=["Metric", "Value", "Interpretation"])
-
-    # --- SIDEBAR & MAIN ---
     with st.sidebar:
-        st.markdown("<h2 style='color: #667eea; text-align: center;'>📊 Dashboard</h2>", unsafe_allow_html=True)
-        if st.button("🚪 Logout"):
+        st.markdown("<h2 style='color: white;'>Settings</h2>", unsafe_allow_html=True)
+        if st.button("🚪 Logout", use_container_width=True):
             st.session_state["password_correct"] = False
             st.rerun()
-        st.markdown("---")
-        uploaded_file = st.file_uploader("Upload Excel file", type=["xlsx"])
-        if uploaded_file: st.success("✓ File loaded")
+        uploaded_file = st.file_uploader("Upload Delinquency Data", type=["xlsx"])
 
     if uploaded_file:
         raw = pd.read_excel(uploaded_file)
-        codes = raw.iloc[:, 0].astype(str)
+        codes = raw.iloc[:, 0].astype(str).unique()
         months = raw.columns[3:]
-        tabs = st.tabs(sorted(codes.unique()))
         
-        excel_out = BytesIO()
-        writer = pd.ExcelWriter(excel_out, engine="xlsxwriter")
+        # Bulk PDF Button in Sidebar
+        if st.sidebar.button("📥 Download All Reports (PDF)"):
+            bulk_buffer = BytesIO()
+            doc = SimpleDocTemplate(bulk_buffer, pagesize=letter)
+            story = []
+            styles = getSampleStyleSheet()
+            
+            for code in codes:
+                subset = raw[raw.iloc[:, 0].astype(str) == code].iloc[0]
+                df, m_df = analyze_loan(subset, months)
+                generate_report_content(code, subset, df, m_df, story, styles)
+                story.append(PageBreak())
+            
+            # Add Glossary Page at the end
+            story.append(Paragraph("Metric Explanation Glossary", styles['Heading1']))
+            gt = Table(get_metric_explanations(), colWidths=[1.5*inch, 2.5*inch, 2.0*inch])
+            gt.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor('#667eea')), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('FONTSIZE', (0,0), (-1,-1), 9)]))
+            story.append(gt)
+            
+            doc.build(story)
+            st.sidebar.download_button("Click to Download Bulk PDF", bulk_buffer.getvalue(), "Consolidated_Risk_Report.pdf")
 
-        for tab, code in zip(tabs, sorted(codes.unique())):
+        tabs = st.tabs(list(codes))
+        for tab, code in zip(tabs, codes):
             with tab:
-                subset = raw[raw.iloc[:, 0].astype(str) == code]
-                for idx, row in subset.iterrows():
-                    df, metrics_df = analyze_loan(row, months)
-                    
-                    st.subheader("Loan Exposure")
-                    c1, c2 = st.columns(2)
-                    c1.metric("Sanctioned Limit", f"{row.iloc[1]:,.0f}")
-                    c2.metric("Outstanding", f"{row.iloc[2]:,.0f}")
+                row = raw[raw.iloc[:, 0].astype(str) == code].iloc[0]
+                df, metrics_df = analyze_loan(row, months)
+                
+                st.title(f"Analysis: {code}")
+                c1, c2 = st.columns(2)
+                c1.metric("Sanctioned Limit", f"{row.iloc[1]:,.0f}")
+                c2.metric("Current Exposure", f"{row.iloc[2]:,.0f}")
 
-                    # Your Custom Metric Cards (3-column layout)
-                    for i in range(0, len(metrics_df), 3):
-                        cols = st.columns(3)
-                        for j, col in enumerate(cols):
-                            if i + j < len(metrics_df):
-                                m = metrics_df.iloc[i + j]
-                                with col:
-                                    st.markdown(f"""
-                                    <div style='background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.07); border-left: 4px solid #667eea; margin-bottom: 15px;'>
-                                        <div style='color: #718096; font-size: 0.75rem; font-weight: 600;'>{m['Metric']}</div>
-                                        <div style='color: #2d3748; font-size: 1.8rem; font-weight: 700;'>{m['Value']}</div>
-                                        <div style='color: #a0aec0; font-size: 0.8rem;'>{m['Interpretation']}</div>
-                                    </div>
-                                    """, unsafe_allow_html=True)
+                # Display Metrics
+                m_cols = st.columns(3)
+                for i, (_, m) in enumerate(metrics_df.iterrows()):
+                    with m_cols[i % 3]:
+                        st.markdown(f"""
+                        <div class="metric-card">
+                            <div style="color: #718096; font-size: 0.8rem; font-weight: 600;">{m['Metric']}</div>
+                            <div style="color: #2d3748; font-size: 1.5rem; font-weight: 700;">{m['Value']}</div>
+                            <div style="color: #a0aec0; font-size: 0.75rem;">{m['Interpretation']}</div>
+                        </div><br>
+                        """, unsafe_allow_html=True)
 
-                    # DPD Trend Chart (Exact Replication)
-                    fig, ax = plt.subplots(figsize=(12, 4.5), facecolor='white')
-                    ax.set_facecolor('#f8f9fa')
-                    if (df["Status"] == "Not Disbursed").any(): ax.axvspan(-0.5, (df["Status"] == "Not Disbursed").sum() - 0.5, alpha=0.1, color='gray', label='Not Disbursed')
-                    if (df["Status"] == "Settled").any(): ax.axvspan(df[df["Status"] == "Settled"].index[0] - 0.5, len(df) - 0.5, alpha=0.1, color='green', label='Settled')
-                    
-                    plot_data = df[df["Status"] != "Not Disbursed"]
-                    ax.plot(plot_data.index, plot_data["DPD"], marker="o", color="#667eea", linewidth=2.5, label="DPD")
-                    ax.plot(plot_data.index, plot_data["Rolling_3M"], linestyle="--", color="#764ba2", label="3M Avg")
-                    ax.set_xticks(range(len(df))); ax.set_xticklabels(df["Month"], rotation=45)
-                    st.pyplot(fig)
+                # Screen Chart
+                fig, ax = plt.subplots(figsize=(12, 4))
+                plot_data = df[df["Status"] != "Not Disbursed"]
+                ax.plot(plot_data["Month"], plot_data["DPD"], marker="o", color="#667eea", label="DPD")
+                ax.set_xticklabels(plot_data["Month"], rotation=45)
+                st.pyplot(fig)
 
-                    pdf_buf = generate_pdf(code, row, df, metrics_df)
-                    st.download_button(f"📄 Download PDF - {code}", pdf_buf, f"Analysis_{code}.pdf", "application/pdf")
-                    df.to_excel(writer, sheet_name=str(code)[:31], index=False)
-        writer.close()
-        st.sidebar.download_button("📂 Download Full Excel", excel_out.getvalue(), "loan_analysis.xlsx")
+                # Individual PDF Download
+                pdf_buf = BytesIO()
+                doc = SimpleDocTemplate(pdf_buf, pagesize=letter)
+                single_story = generate_report_content(code, row, df, metrics_df, [], getSampleStyleSheet())
+                
+                # Add Glossary to individual report too
+                single_story.append(PageBreak())
+                single_story.append(Paragraph("Metric Explanation Glossary", getSampleStyleSheet()['Heading1']))
+                gt = Table(get_metric_explanations(), colWidths=[1.5*inch, 2.5*inch, 2.0*inch])
+                gt.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor('#667eea')), ('TEXTCOLOR', (0,0), (-1,0), colors.white), ('GRID', (0,0), (-1,-1), 0.5, colors.grey)]))
+                single_story.append(gt)
+                
+                doc.build(single_story)
+                st.download_button(f"📄 Download PDF Report - {code}", pdf_buf.getvalue(), f"Risk_Report_{code}.pdf")
+
     else:
-        # Replicated Landing Page
-        st.markdown("<div style='text-align:center; padding:60px;'><h1>Loan Delinquency Risk Dashboard</h1><p>Advanced Analytics Platform</p></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center; padding:5rem;'><h1>Welcome to Risk Portal</h1><p>Upload an Excel file to begin delinquency analysis.</p></div>", unsafe_allow_html=True)
