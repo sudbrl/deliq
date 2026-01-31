@@ -4,12 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.lib import colors
 import tempfile
-from scipy.stats import skew, kurtosis, mode
 from sklearn.linear_model import LinearRegression
 
 # -------------------------------------------------
@@ -50,47 +48,58 @@ def check_password():
     return False
 
 # -------------------------------------------------
+# SAFE STAT FUNCTIONS (NO SCIPY)
+# -------------------------------------------------
+def calc_skew(x):
+    m = np.mean(x)
+    s = np.std(x, ddof=1)
+    return np.mean(((x - m) / s) ** 3) if s != 0 else 0
+
+def calc_kurtosis(x):
+    m = np.mean(x)
+    s = np.std(x, ddof=1)
+    return np.mean(((x - m) / s) ** 4) if s != 0 else 0
+
+def calc_mode(x):
+    return pd.Series(x).mode().iloc[0]
+
+# -------------------------------------------------
 # METRICS ENGINE (EXCEL)
 # -------------------------------------------------
 def build_excel_metrics(dpd_series):
-    dpd = dpd_series.values
-    t = np.arange(len(dpd)).reshape(-1,1)
+    dpd = dpd_series.values.astype(float)
+    t = np.arange(len(dpd)).reshape(-1, 1)
 
     lr = LinearRegression().fit(t, dpd)
     slope = lr.coef_[0]
 
-    buckets = {
-        "0": int(np.sum(dpd == 0)),
-        "1–30": int(np.sum((dpd > 0) & (dpd <= 30))),
-        "31–60": int(np.sum((dpd > 30) & (dpd <= 60))),
-        "61–90": int(np.sum((dpd > 60) & (dpd <= 90))),
-    }
-
     metrics = [
         ["Mean DPD", round(np.mean(dpd),2), "Average delinquency per month"],
-        ["Median DPD", np.median(dpd), "50% months below this"],
-        ["Mode DPD", int(mode(dpd, keepdims=True).mode[0]), "Most frequent value"],
+        ["Median DPD", int(np.median(dpd)), "50% months below"],
+        ["Mode DPD", int(calc_mode(dpd)), "Most frequent"],
         ["Min DPD", int(np.min(dpd)), "Best month"],
         ["Max DPD", int(np.max(dpd)), "Worst month"],
         ["Range", int(np.ptp(dpd)), "Spread"],
         ["Std Deviation", round(np.std(dpd,ddof=1),2), "Volatility"],
-        ["Skewness", round(skew(dpd),2), "Right-tail risk"],
-        ["Kurtosis", round(kurtosis(dpd,fisher=False),2), "Extreme events"],
+        ["Skewness", round(calc_skew(dpd),2), "Right tail risk"],
+        ["Kurtosis", round(calc_kurtosis(dpd),2), "Extreme events"],
 
         ["Delinquent Months", int((dpd>0).sum()), "Frequency"],
         ["Proportion Delinquent", round((dpd>0).mean(),2), "Share delinquent"],
-        ["Delinquency Buckets", str(buckets), "Severity distribution"],
 
-        ["Cumulative DPD", int(dpd.sum()), "Life-to-date exposure"],
+        ["Cumulative DPD", int(dpd.sum()), "Life exposure"],
         ["Trend Slope", round(slope,2), "Momentum"],
-        ["Autocorr Lag 1", round(np.corrcoef(dpd[:-1],dpd[1:])[0,1],2) if len(dpd)>1 else 0, "Persistence"],
-        ["Autocorr Lag 2", round(np.corrcoef(dpd[:-2],dpd[2:])[0,1],2) if len(dpd)>2 else 0, "Medium-term"],
+        ["Autocorr Lag 1",
+         round(np.corrcoef(dpd[:-1],dpd[1:])[0,1],2) if len(dpd)>1 else 0,
+         "Persistence"],
 
         ["Prob 90+ DPD", round((dpd>=90).mean(),3), "Extreme risk"],
-        ["Weighted Delinquency Index", int(np.sum(dpd*(dpd>0))), "Severity weighted"],
-        ["Time to First Delinquency", int(np.argmax(dpd>0)) if np.any(dpd>0) else "NA", "Early warning"],
-        ["Coeff of Variation", round(np.std(dpd)/np.mean(dpd),2) if np.mean(dpd)>0 else 0, "Relative volatility"],
-        ["Sticky Bucket", "90+" if np.max(dpd)>=90 else "60+" if np.max(dpd)>=60 else "30+", "Historical severity"]
+        ["Coeff of Variation",
+         round(np.std(dpd)/np.mean(dpd),2) if np.mean(dpd)>0 else 0,
+         "Relative volatility"],
+        ["Sticky Bucket",
+         "90+" if np.max(dpd)>=90 else "60+" if np.max(dpd)>=60 else "30+",
+         "Historical severity"]
     ]
 
     return pd.DataFrame(metrics, columns=["Metric","Value","Interpretation"])
@@ -114,7 +123,8 @@ def plot_chart(df, max_dpd, max_month):
     ax.plot(df["Month"], df["DPD"], marker="o")
     ax.plot(df["Month"], df["Rolling_3M"], linestyle="--")
     ax.plot(max_month, max_dpd, "r*", markersize=14)
-    ax.text(max_month, max_dpd+3, f"MAX {int(max_dpd)}", ha="center", color="red")
+    ax.text(max_month, max_dpd+3, f"MAX {int(max_dpd)}",
+            ha="center", color="red")
     plt.xticks(rotation=45)
     plt.tight_layout()
     return fig
@@ -124,12 +134,16 @@ def plot_chart(df, max_dpd, max_month):
 # -------------------------------------------------
 def build_pdf(story, code, df, max_dpd, max_month):
     styles = getSampleStyleSheet()
-    story.append(Paragraph(f"Loan Performance – {code}",
-        ParagraphStyle("t",fontName="Helvetica-Bold",fontSize=16,leading=18)))
+    story.append(Paragraph(
+        f"Loan Performance – {code}",
+        ParagraphStyle("t", fontName="Helvetica-Bold",
+                       fontSize=16, leading=18)))
     story.append(Spacer(1,12))
 
-    fig_path = tempfile.NamedTemporaryFile(delete=False,suffix=".png").name
-    plot_chart(df,max_dpd,max_month).savefig(fig_path,dpi=150,bbox_inches="tight")
+    fig_path = tempfile.NamedTemporaryFile(
+        delete=False, suffix=".png").name
+    plot_chart(df,max_dpd,max_month).savefig(
+        fig_path, dpi=150, bbox_inches="tight")
     plt.close()
 
     story.append(Image(fig_path,6.5*inch,3.2*inch))
@@ -176,7 +190,12 @@ if check_password():
 
             doc.build(story)
 
-        st.sidebar.download_button("📊 Download Excel",
-            excel_buf.getvalue(),"Risk_Metrics.xlsx")
-        st.sidebar.download_button("📦 Download PDF",
-            pdf_buf.getvalue(),"Risk_Report.pdf")
+        st.sidebar.download_button(
+            "📊 Download Excel",
+            excel_buf.getvalue(),
+            "Risk_Metrics.xlsx")
+
+        st.sidebar.download_button(
+            "📦 Download PDF",
+            pdf_buf.getvalue(),
+            "Risk_Report.pdf")
