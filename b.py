@@ -10,59 +10,39 @@ from reportlab.lib import colors
 import tempfile
 
 # -------------------------------------------------
-# 1. AUTHENTICATION – CENTERED WITH LOGO
+# 1. AUTHENTICATION – CENTERED LOGIN WITH LOGO
 # -------------------------------------------------
 def check_password():
     if "auth" not in st.session_state:
         st.session_state.auth = False
-
     if st.session_state.auth:
         return True
 
     st.markdown("""
     <style>
-    .stApp {
-        background: radial-gradient(circle at top, #eef2ff, #f8fafc);
-    }
+    .stApp { background: radial-gradient(circle at top, #eef2ff, #f8fafc); }
     .login-wrapper {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        min-height: 100vh; display: flex;
+        align-items: center; justify-content: center;
     }
     .login-card {
-        background: white;
-        width: 420px;
+        background: white; width: 420px;
         padding: 3rem 2.8rem;
         border-radius: 16px;
         box-shadow: 0 20px 45px rgba(0,0,0,0.12);
         border: 1px solid #e5e7eb;
         text-align: center;
     }
-    .logo {
-        font-size: 3.2rem;
-        margin-bottom: 0.5rem;
-    }
-    .app-title {
-        font-size: 1.6rem;
-        font-weight: 600;
-        color: #111827;
-        margin-bottom: 0.2rem;
-    }
-    .app-subtitle {
-        font-size: 0.9rem;
-        color: #6b7280;
-        margin-bottom: 2.2rem;
-    }
+    .logo { font-size: 3.2rem; margin-bottom: .5rem; }
+    .title { font-size: 1.6rem; font-weight: 600; color: #111827; }
+    .sub { font-size: .9rem; color: #6b7280; margin-bottom: 2rem; }
     </style>
     """, unsafe_allow_html=True)
 
     st.markdown("<div class='login-wrapper'><div class='login-card'>", unsafe_allow_html=True)
-
-    # Fancy logo (emoji-based, enterprise-safe)
     st.markdown("<div class='logo'>🛡️</div>", unsafe_allow_html=True)
-    st.markdown("<div class='app-title'>Risk Intelligence</div>", unsafe_allow_html=True)
-    st.markdown("<div class='app-subtitle'>Secure Analytics Portal</div>", unsafe_allow_html=True)
+    st.markdown("<div class='title'>Risk Intelligence</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sub'>Secure Analytics Portal</div>", unsafe_allow_html=True)
 
     u = st.text_input("Username")
     p = st.text_input("Password", type="password")
@@ -78,75 +58,82 @@ def check_password():
     return False
 
 # -------------------------------------------------
-# 2. ANALYTICS
+# 2. ANALYTICS ENGINE (ENHANCED METRICS)
 # -------------------------------------------------
 def analyze_loan(row, months):
-    dpd = row[months].astype(float)
-    active = dpd.dropna().fillna(0)
+    dpd = row[months].astype(float).fillna(0)
+    active = dpd[dpd.index >= dpd.ne(0).idxmax()]
 
     df = pd.DataFrame({
         "Month": months.astype(str),
-        "DPD": dpd.fillna(0),
+        "DPD": dpd
     })
     df["Rolling_3M"] = df["DPD"].rolling(3).mean().fillna(0)
 
-    max_d = active.max()
+    max_dpd = dpd.max()
+    max_month = df.loc[df["DPD"].idxmax(), "Month"]
+
     metrics = pd.DataFrame([
-        ["Loan Status", "Active" if active.index[-1] == months[-1] else "Settled", "Current"],
-        ["Active Tenure", f"{len(active)} Months", "Exposure"],
-        ["Delinquency Density", f"{(active>0).mean():.1%}", "Frequency"],
-        ["Maximum DPD", f"{int(max_d)} Days", "Peak Risk"],
-        ["Sticky Bucket", "90+" if max_d>=90 else "30-89" if max_d>=30 else "0-29", "Risk Tier"],
-        ["Cumulative DPD", f"{int(active.sum())}", "Loss Volume"]
-    ], columns=["Metric","Value","Importance"])
+        ["Loan Status", "Active" if dpd.iloc[-1] > 0 else "Settled"],
+        ["Active Tenure (Months)", len(active)],
+        ["Delinquency Density", f"{(active > 0).mean():.1%}"],
+        ["Max DPD", f"{int(max_dpd)}"],
+        ["Max DPD Month", max_month],
+        ["Months Ever Delinquent", int((active > 0).sum())],
+        ["Severe DPD Rate (60+)", f"{(active >= 60).mean():.1%}"],
+        ["Average DPD", f"{active.mean():.1f}"],
+        ["Cumulative DPD", int(active.sum())]
+    ], columns=["Metric", "Value"])
 
-    return df, metrics
-
-# -------------------------------------------------
-# 3. METRIC GLOSSARY (UI ONLY)
-# -------------------------------------------------
-def metric_glossary():
-    return pd.DataFrame([
-        ["Delinquency Density","Payment failure frequency","Count(DPD>0)/Months"],
-        ["Maximum DPD","Worst delinquency observed","Max(DPD)"],
-        ["Sticky Bucket","Peak delinquency band","Regulatory buckets"],
-        ["Rolling 3M Avg","Smoothed delinquency trend","Mean(last 3)"],
-        ["Cumulative DPD","Lifetime delinquency volume","Sum(DPD)"]
-    ], columns=["Metric","Definition","Logic"])
+    return df, metrics, max_dpd, max_month
 
 # -------------------------------------------------
-# 4. PDF
+# 3. CHART (SCREEN + PDF)
 # -------------------------------------------------
-def create_chart(df):
-    fig, ax = plt.subplots(figsize=(8,4))
-    ax.plot(df["Month"], df["DPD"], marker="o")
-    ax.plot(df["Month"], df["Rolling_3M"], linestyle="--")
+def plot_chart(df, max_dpd, max_month):
+    fig, ax = plt.subplots(figsize=(10, 3.5))
+    ax.plot(df["Month"], df["DPD"], marker="o", label="DPD")
+    ax.plot(df["Month"], df["Rolling_3M"], linestyle="--", label="Rolling 3M")
+
+    ax.plot(max_month, max_dpd, "r*", markersize=14, label="Max DPD")
+    ax.text(max_month, max_dpd + 3, f"MAX {int(max_dpd)}",
+            ha="center", color="red", fontweight="bold")
+
     plt.xticks(rotation=45)
+    ax.legend()
     plt.tight_layout()
+    return fig
 
+def create_pdf_chart(df, max_dpd, max_month):
+    fig = plot_chart(df, max_dpd, max_month)
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(tmp.name)
-    plt.close()
+    fig.savefig(tmp.name, dpi=150, bbox_inches="tight")
+    plt.close(fig)
     return tmp.name
 
-def build_pdf(story, code, df, metrics, styles):
+# -------------------------------------------------
+# 4. PDF REPORT
+# -------------------------------------------------
+def build_pdf(story, code, df, metrics, max_dpd, max_month, styles):
     story.append(Paragraph(f"Loan Performance Report – {code}", styles["Heading1"]))
-    story.append(Spacer(1,12))
+    story.append(Spacer(1, 12))
 
     t = Table([metrics.columns.tolist()] + metrics.values.tolist(),
-              colWidths=[2*inch,2*inch,2.5*inch])
+              colWidths=[3*inch, 3*inch])
     t.setStyle(TableStyle([
         ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#1e3a8a")),
         ("TEXTCOLOR",(0,0),(-1,0),colors.white),
         ("GRID",(0,0),(-1,-1),.5,colors.grey)
     ]))
     story.append(t)
-    story.append(Spacer(1,20))
-    story.append(Image(create_chart(df),6.5*inch,3.2*inch))
+    story.append(Spacer(1, 18))
+
+    story.append(Image(create_pdf_chart(df, max_dpd, max_month),
+                       6.5*inch, 3.2*inch))
     story.append(PageBreak())
 
 # -------------------------------------------------
-# 5. APP
+# 5. MAIN APP
 # -------------------------------------------------
 if check_password():
     st.set_page_config("Risk Intel", layout="wide")
@@ -160,7 +147,7 @@ if check_password():
 
     if file:
         raw = pd.read_excel(file)
-        codes = raw.iloc[:,0].unique()
+        codes = raw.iloc[:, 0].unique()
         months = raw.columns[3:]
 
         excel_buf = BytesIO()
@@ -174,34 +161,36 @@ if check_password():
             tabs = st.tabs([str(c) for c in codes])
 
             for tab, code in zip(tabs, codes):
-                row = raw[raw.iloc[:,0]==code].iloc[0]
-                df, metrics = analyze_loan(row, months)
+                row = raw[raw.iloc[:, 0] == code].iloc[0]
+                df, metrics, max_dpd, max_month = analyze_loan(row, months)
+
                 df.to_excel(writer, sheet_name=str(code)[:31], index=False)
 
                 with tab:
                     st.subheader(f"Account {code}")
-                    st.dataframe(metrics, hide_index=True)
+                    st.dataframe(metrics, hide_index=True, use_container_width=True)
 
-                    with st.expander("📘 Metric Explanation"):
-                        st.dataframe(metric_glossary(), hide_index=True, use_container_width=True)
-
-                    fig, ax = plt.subplots(figsize=(10,3))
-                    ax.plot(df["Month"], df["DPD"], marker="o")
-                    plt.xticks(rotation=45)
+                    fig = plot_chart(df, max_dpd, max_month)
                     st.pyplot(fig)
 
                     sbuf = BytesIO()
                     sdoc = SimpleDocTemplate(sbuf, pagesize=letter)
                     sstory = []
-                    build_pdf(sstory, code, df, metrics, styles)
+                    build_pdf(sstory, code, df, metrics, max_dpd, max_month, styles)
                     sdoc.build(sstory)
 
-                    st.download_button("📄 Download Report", sbuf.getvalue(), f"Report_{code}.pdf")
+                    st.download_button("📄 Download Report",
+                                       sbuf.getvalue(),
+                                       f"Report_{code}.pdf")
 
-                build_pdf(story, code, df, metrics, styles)
+                build_pdf(story, code, df, metrics, max_dpd, max_month, styles)
 
             doc.build(story)
 
         st.sidebar.markdown("---")
-        st.sidebar.download_button("📊 Download Excel", excel_buf.getvalue(), "Risk_Analysis.xlsx")
-        st.sidebar.download_button("📦 Download Report (Bulk)", bulk_pdf.getvalue(), "Report_Bulk.pdf")
+        st.sidebar.download_button("📊 Download Excel",
+                                   excel_buf.getvalue(),
+                                   "Risk_Analysis.xlsx")
+        st.sidebar.download_button("📦 Download Report (Bulk)",
+                                   bulk_pdf.getvalue(),
+                                   "Report_Bulk.pdf")
