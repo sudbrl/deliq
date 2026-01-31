@@ -28,14 +28,6 @@ def inject_custom_css():
         }
         
         /* Full Screen Login Page Styling */
-        .login-fullscreen {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-        }
-        
         .login-container {
             background: rgba(255, 255, 255, 0.98);
             padding: 4.5rem 4rem;
@@ -43,8 +35,9 @@ def inject_custom_css():
             box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(20px);
             border: 2px solid rgba(255, 255, 255, 0.3);
-            max-width: 550px;
             width: 100%;
+            margin-top: 2rem;
+            margin-bottom: 2rem;
         }
         
         .login-header {
@@ -409,6 +402,46 @@ def inject_custom_css():
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+        
+        /* Streamlit Compatibility Fixes */
+        .main .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+            max-width: 100%;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .login-container {
+                padding: 3rem 2rem;
+            }
+            
+            .login-title {
+                font-size: 2rem;
+            }
+            
+            .metric-card {
+                padding: 1.5rem;
+            }
+            
+            .metric-value {
+                font-size: 1.8rem;
+            }
+            
+            .account-title {
+                font-size: 1.5rem;
+            }
+        }
+        
+        /* Fix for tabs overflow */
+        .stTabs [data-baseweb="tab-list"] {
+            overflow-x: auto;
+        }
+        
+        /* Improve text readability */
+        .stMarkdown {
+            max-width: 100%;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -424,9 +457,21 @@ def check_password():
 
     inject_custom_css()
     
-    # Full-screen login layout
+    # Hide sidebar on login page
     st.markdown("""
-        <div class='login-fullscreen'>
+        <style>
+        [data-testid="stSidebar"] {
+            display: none;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    # Full-screen login layout - simpler HTML for Streamlit compatibility
+    st.markdown("<div style='height: 3vh;'></div>", unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("""
             <div class='login-container'>
                 <div class='login-header'>
                     <div class='login-icon'>🛡️</div>
@@ -434,48 +479,47 @@ def check_password():
                     <p class='login-subtitle'>Enterprise Delinquency Analytics & Reporting System</p>
                     <div class='security-badge'>🔒 256-bit Encrypted Access</div>
                 </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
-    u = st.text_input("👤 Username", placeholder="Enter your username", key="username_input")
-    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
-    p = st.text_input("🔑 Password", type="password", placeholder="Enter your password", key="password_input")
-    st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
-    
-    if st.button("🔐 Sign In Securely", use_container_width=True, type="primary"):
-        if u in st.secrets["passwords"] and p == st.secrets["passwords"][u]:
-            st.session_state["password_correct"] = True
-            st.rerun()
-        else:
-            st.error("❌ Invalid credentials. Please check your username and password.")
-    
-    st.markdown("""
-                <div class='login-features'>
-                    <div class='feature-item'>
-                        <div class='feature-icon'>📊</div>
-                        <div class='feature-text'>Advanced Analytics</div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
+        u = st.text_input("👤 Username", placeholder="Enter your username", key="username_input")
+        st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+        p = st.text_input("🔑 Password", type="password", placeholder="Enter your password", key="password_input")
+        st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
+        
+        if st.button("🔐 Sign In Securely", use_container_width=True, type="primary"):
+            if u in st.secrets["passwords"] and p == st.secrets["passwords"][u]:
+                st.session_state["password_correct"] = True
+                st.rerun()
+            else:
+                st.error("❌ Invalid credentials. Please check your username and password.")
+        
+        st.markdown("""
+                    <div class='login-features'>
+                        <div class='feature-item'>
+                            <div class='feature-icon'>📊</div>
+                            <div class='feature-text'>Advanced Analytics</div>
+                        </div>
+                        <div class='feature-item'>
+                            <div class='feature-icon'>📋</div>
+                            <div class='feature-text'>PDF Reporting</div>
+                        </div>
+                        <div class='feature-item'>
+                            <div class='feature-icon'>🔒</div>
+                            <div class='feature-text'>Secure Access</div>
+                        </div>
+                        <div class='feature-item'>
+                            <div class='feature-icon'>⚡</div>
+                            <div class='feature-text'>Real-time Insights</div>
+                        </div>
                     </div>
-                    <div class='feature-item'>
-                        <div class='feature-icon'>📋</div>
-                        <div class='feature-text'>PDF Reporting</div>
-                    </div>
-                    <div class='feature-item'>
-                        <div class='feature-icon'>🔒</div>
-                        <div class='feature-text'>Secure Access</div>
-                    </div>
-                    <div class='feature-item'>
-                        <div class='feature-icon'>⚡</div>
-                        <div class='feature-text'>Real-time Insights</div>
+                    
+                    <div style='text-align: center; margin-top: 2.5rem; padding-top: 2rem; border-top: 1px solid #e2e8f0;'>
+                        <p style='color: #94a3b8; font-size: 0.85rem;'>© 2025 Risk Intelligence Platform. All rights reserved.</p>
+                        <p style='color: #cbd5e1; font-size: 0.75rem; margin-top: 0.5rem;'>Protected by industry-standard encryption and security protocols</p>
                     </div>
                 </div>
-                
-                <div style='text-align: center; margin-top: 2.5rem; padding-top: 2rem; border-top: 1px solid #e2e8f0;'>
-                    <p style='color: #94a3b8; font-size: 0.85rem;'>© 2025 Risk Intelligence Platform. All rights reserved.</p>
-                    <p style='color: #cbd5e1; font-size: 0.75rem; margin-top: 0.5rem;'>Protected by industry-standard encryption and security protocols</p>
-                </div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
     return False
 
@@ -605,7 +649,7 @@ def display_fancy_metrics(metrics_df, loan_status, sanctioned, balance):
             <div class='metric-card'>
                 <div class='metric-icon'>💰</div>
                 <div class='metric-label'>Sanctioned Amount</div>
-                <div class='metric-value'>₹{sanctioned:,.0f}</div>
+                <div class='metric-value'>Rs. {sanctioned:,.0f}</div>
                 <div class='metric-context'>Original loan amount</div>
             </div>
         """, unsafe_allow_html=True)
@@ -615,7 +659,7 @@ def display_fancy_metrics(metrics_df, loan_status, sanctioned, balance):
             <div class='metric-card'>
                 <div class='metric-icon'>📊</div>
                 <div class='metric-label'>Outstanding Balance</div>
-                <div class='metric-value'>₹{balance:,.0f}</div>
+                <div class='metric-value'>Rs. {balance:,.0f}</div>
                 <div class='metric-context'>{(balance/sanctioned*100):.1f}% of principal</div>
             </div>
         """, unsafe_allow_html=True)
@@ -722,8 +766,16 @@ def build_pdf(story, code, row, df, metrics_df, styles):
 # -------------------------------------------------
 # 6. MAIN INTERFACE
 # -------------------------------------------------
+
+# Set page config FIRST before anything else
+st.set_page_config(
+    page_title="Risk Intelligence Platform", 
+    layout="wide", 
+    page_icon="🛡️",
+    initial_sidebar_state="collapsed"
+)
+
 if check_password():
-    st.set_page_config(page_title="Risk Intelligence Platform", layout="wide", page_icon="🛡️")
     inject_custom_css()
 
     with st.sidebar:
@@ -739,16 +791,22 @@ if check_password():
         if uploaded_file:
             st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
             st.markdown("---")
-            st.markdown("<h3 style='color: #f3e8ff;'>📚 Resources</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='color: #f3e8ff;'>📖 Risk Metrics Glossary</h3>", unsafe_allow_html=True)
             
-            with st.expander("📖 View Metrics Guide", expanded=False):
+            with st.expander("View Complete Metrics Guide", expanded=False):
                 st.markdown("""
                 <div style='color: #e9d5ff; font-size: 0.88rem; line-height: 1.6;'>
-                    <p><strong style='color: #faf5ff;'>Delinquency Density:</strong> Payment failure frequency</p>
-                    <p><strong style='color: #faf5ff;'>Maximum DPD:</strong> Highest risk point reached</p>
-                    <p><strong style='color: #faf5ff;'>Sticky Bucket:</strong> Regulatory risk category</p>
-                    <p><strong style='color: #faf5ff;'>Rolling 3M Avg:</strong> Trend smoothing indicator</p>
-                    <p><strong style='color: #faf5ff;'>Cumulative DPD:</strong> Total loss exposure</p>
+                    <p><strong style='color: #faf5ff;'>Delinquency Density:</strong> Frequency of payment failure across active tenure. Formula: Count(DPD > 0) / Total Active Months. Identifies chronic defaulters vs one-time delays.</p>
+                    
+                    <p><strong style='color: #faf5ff;'>Maximum DPD:</strong> Highest number of days past due ever reached. Formula: Max(All DPD Values). Determines capital provisioning requirements.</p>
+                    
+                    <p><strong style='color: #faf5ff;'>Sticky Bucket:</strong> Risk categorization based on peak delinquency. Categories: 90+ (NPA) | 30-89 (Sub-Standard) | 0-29 (Standard). Regulatory classification for risk-weighted assets.</p>
+                    
+                    <p><strong style='color: #faf5ff;'>Rolling 3-Month Average:</strong> Moving average of delinquency to smooth volatility. Formula: Sum(Last 3 Months DPD) / 3. Reveals underlying trends beyond monthly spikes.</p>
+                    
+                    <p><strong style='color: #faf5ff;'>Cumulative DPD:</strong> Total days past due accumulated over loan lifecycle. Formula: Sum(All DPD Values). Measures total exposure to credit loss.</p>
+                    
+                    <p><strong style='color: #faf5ff;'>Active Tenure:</strong> Number of months from disbursement to settlement/current. Formula: Count(Months with Balance > 0). Loan maturity indicator for vintage analysis.</p>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -936,5 +994,11 @@ if check_password():
         
         # Add Glossary at Bottom
         st.markdown("<div style='height: 3rem;'></div>", unsafe_allow_html=True)
-        with st.expander("📖 View Complete Risk Metrics Glossary", expanded=False):
-            display_metric_glossary()
+        st.markdown("---")
+        st.markdown("""
+            <div style='text-align: center; padding: 2rem; background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%); border-radius: 16px;'>
+                <p style='color: #a78bfa; font-size: 0.95rem;'>
+                    💡 <strong>Tip:</strong> Access the complete Risk Metrics Glossary in the sidebar for detailed definitions and formulas.
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
