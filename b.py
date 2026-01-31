@@ -17,273 +17,397 @@ import tempfile
 def inject_custom_css():
     st.markdown("""
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
         
         * {
             font-family: 'Inter', sans-serif;
         }
         
         .stApp {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
         }
         
-        /* Login Page Styling */
+        /* Full Screen Login Page Styling */
+        .login-fullscreen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
         .login-container {
             background: rgba(255, 255, 255, 0.98);
-            padding: 3.5rem 3rem;
-            border-radius: 24px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(148, 163, 184, 0.2);
+            padding: 4.5rem 4rem;
+            border-radius: 32px;
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            max-width: 550px;
+            width: 100%;
         }
         
         .login-header {
             text-align: center;
-            margin-bottom: 2.5rem;
+            margin-bottom: 3rem;
+        }
+        
+        .login-icon {
+            font-size: 5rem;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 4px 6px rgba(102, 126, 234, 0.3));
         }
         
         .login-title {
-            font-size: 2.2rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #0f172a 0%, #3b82f6 100%);
+            font-size: 2.8rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.8rem;
+            line-height: 1.2;
         }
         
         .login-subtitle {
             color: #64748b;
-            font-size: 0.95rem;
+            font-size: 1.1rem;
             font-weight: 400;
+            margin-bottom: 1.5rem;
         }
         
         .security-badge {
             display: inline-block;
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
-            padding: 0.4rem 1rem;
-            border-radius: 20px;
-            font-size: 0.75rem;
+            padding: 0.6rem 1.5rem;
+            border-radius: 25px;
+            font-size: 0.85rem;
             font-weight: 600;
             margin-top: 1rem;
-            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 6px 12px -2px rgba(16, 185, 129, 0.4);
+        }
+        
+        .login-features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .feature-item {
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature-text {
+            color: #64748b;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        /* Input Fields Styling */
+        .stTextInput > div > div > input {
+            border-radius: 12px;
+            border: 2px solid #e2e8f0;
+            padding: 0.9rem 1.2rem;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .stTextInput > div > div > input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
         
         /* Metric Cards */
         .metric-card {
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-            padding: 1.8rem;
-            border-radius: 16px;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%);
+            padding: 2rem;
+            border-radius: 20px;
+            border: 2px solid #e9d5ff;
+            box-shadow: 0 8px 16px -4px rgba(118, 75, 162, 0.2);
             transition: all 0.3s ease;
             height: 100%;
         }
         
         .metric-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
+            transform: translateY(-6px);
+            box-shadow: 0 24px 32px -8px rgba(118, 75, 162, 0.3);
+            border-color: #c084fc;
         }
         
         .metric-label {
             font-size: 0.85rem;
-            color: #64748b;
-            font-weight: 500;
+            color: #7c3aed;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
             margin-bottom: 0.5rem;
         }
         
         .metric-value {
-            font-size: 2.2rem;
-            font-weight: 700;
-            color: #0f172a;
+            font-size: 2.4rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
             margin-bottom: 0.3rem;
         }
         
         .metric-context {
-            font-size: 0.8rem;
-            color: #94a3b8;
-            font-weight: 400;
+            font-size: 0.85rem;
+            color: #a78bfa;
+            font-weight: 500;
         }
         
         .metric-icon {
-            font-size: 2rem;
-            margin-bottom: 0.8rem;
-            opacity: 0.8;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            filter: grayscale(0.3);
         }
         
         /* Risk Badges */
         .risk-badge-low {
             background: linear-gradient(135deg, #10b981 0%, #059669 100%);
             color: white;
-            padding: 0.4rem 1.2rem;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 1.1rem;
+            padding: 0.5rem 1.4rem;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 1.15rem;
             display: inline-block;
-            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 6px 12px -2px rgba(16, 185, 129, 0.5);
         }
         
         .risk-badge-medium {
             background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
             color: white;
-            padding: 0.4rem 1.2rem;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 1.1rem;
+            padding: 0.5rem 1.4rem;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 1.15rem;
             display: inline-block;
-            box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.4);
+            box-shadow: 0 6px 12px -2px rgba(245, 158, 11, 0.5);
         }
         
         .risk-badge-high {
             background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             color: white;
-            padding: 0.4rem 1.2rem;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 1.1rem;
+            padding: 0.5rem 1.4rem;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 1.15rem;
             display: inline-block;
-            box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.4);
+            box-shadow: 0 6px 12px -2px rgba(239, 68, 68, 0.5);
         }
         
         /* Info Panel */
         .info-panel {
-            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-            border-left: 4px solid #3b82f6;
-            padding: 1.5rem;
-            border-radius: 12px;
+            background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%);
+            border-left: 5px solid #a78bfa;
+            padding: 2rem;
+            border-radius: 16px;
             margin: 2rem 0;
+            box-shadow: 0 4px 6px -1px rgba(167, 139, 250, 0.2);
         }
         
         .info-title {
-            font-weight: 600;
-            color: #1e40af;
-            font-size: 1.1rem;
-            margin-bottom: 1rem;
+            font-weight: 700;
+            color: #6b21a8;
+            font-size: 1.3rem;
+            margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.7rem;
         }
         
         .metric-definition {
             background: white;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 0.8rem;
-            border: 1px solid #bfdbfe;
+            padding: 1.3rem;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            border: 2px solid #e9d5ff;
+            transition: all 0.3s ease;
+        }
+        
+        .metric-definition:hover {
+            border-color: #c084fc;
+            box-shadow: 0 4px 8px -2px rgba(192, 132, 252, 0.3);
         }
         
         .metric-def-name {
-            font-weight: 600;
-            color: #1e40af;
-            font-size: 0.95rem;
-            margin-bottom: 0.3rem;
+            font-weight: 700;
+            color: #7c3aed;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
         }
         
         .metric-def-text {
-            color: #475569;
-            font-size: 0.85rem;
-            line-height: 1.5;
+            color: #64748b;
+            font-size: 0.88rem;
+            line-height: 1.6;
         }
         
         /* Header Enhancement */
         .main-header {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            padding: 2rem;
-            border-radius: 16px;
-            margin-bottom: 2rem;
-            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 2.5rem;
+            border-radius: 20px;
+            margin-bottom: 2.5rem;
+            border: 2px solid rgba(192, 132, 252, 0.3);
+            box-shadow: 0 10px 20px -5px rgba(118, 75, 162, 0.4);
         }
         
         .account-title {
             color: white;
-            font-size: 1.8rem;
-            font-weight: 700;
+            font-size: 2rem;
+            font-weight: 800;
             margin-bottom: 0.5rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
         
         .account-subtitle {
-            color: #94a3b8;
-            font-size: 0.95rem;
+            color: #e9d5ff;
+            font-size: 1.05rem;
+            font-weight: 500;
         }
         
-        /* Sidebar Enhancements */
+        /* Sidebar Enhancements - FIXED VISIBILITY */
         [data-testid="stSidebar"] {
-            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            background: linear-gradient(180deg, #2d1b4e 0%, #1a0f2e 100%);
         }
         
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] label,
         [data-testid="stSidebar"] .stMarkdown {
-            color: #e2e8f0;
+            color: #f3e8ff !important;
+        }
+        
+        [data-testid="stSidebar"] .stMarkdown p {
+            color: #e9d5ff !important;
+        }
+        
+        [data-testid="stSidebar"] .element-container {
+            color: #f3e8ff !important;
+        }
+        
+        /* File Uploader in Sidebar */
+        [data-testid="stSidebar"] [data-testid="stFileUploader"] label {
+            color: #f3e8ff !important;
+            font-weight: 600 !important;
+        }
+        
+        /* Expander in Sidebar */
+        [data-testid="stSidebar"] [data-testid="stExpander"] {
+            background-color: rgba(167, 139, 250, 0.1);
+            border: 1px solid rgba(167, 139, 250, 0.3);
+            border-radius: 8px;
+        }
+        
+        [data-testid="stSidebar"] [data-testid="stExpander"] summary {
+            color: #f3e8ff !important;
+            font-weight: 600 !important;
         }
         
         /* Button Enhancements */
         .stButton > button {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            font-weight: 600;
+            font-weight: 700;
             border: none;
-            border-radius: 10px;
-            padding: 0.6rem 1.5rem;
+            border-radius: 12px;
+            padding: 0.8rem 1.8rem;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4);
+            box-shadow: 0 6px 12px -2px rgba(102, 126, 234, 0.5);
+            font-size: 1rem;
         }
         
         .stButton > button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.5);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 20px -4px rgba(102, 126, 234, 0.6);
+        }
+        
+        /* Download Button Special Styling */
+        .stDownloadButton > button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            box-shadow: 0 6px 12px -2px rgba(16, 185, 129, 0.5);
+        }
+        
+        .stDownloadButton > button:hover {
+            box-shadow: 0 12px 20px -4px rgba(16, 185, 129, 0.6);
         }
         
         /* Tabs Styling */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 8px;
-            background-color: rgba(255, 255, 255, 0.05);
-            padding: 0.5rem;
-            border-radius: 12px;
+            gap: 10px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            padding: 0.7rem;
+            border-radius: 16px;
         }
         
         .stTabs [data-baseweb="tab"] {
             background-color: transparent;
-            border-radius: 8px;
-            color: #cbd5e1;
-            font-weight: 500;
+            border-radius: 10px;
+            color: #a78bfa;
+            font-weight: 600;
+            padding: 0.6rem 1.5rem;
         }
         
         .stTabs [aria-selected="true"] {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            box-shadow: 0 4px 8px -2px rgba(102, 126, 234, 0.4);
         }
         
         /* Status Indicator */
         .status-active {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            background: rgba(16, 185, 129, 0.1);
+            gap: 0.6rem;
+            background: rgba(16, 185, 129, 0.15);
             color: #059669;
-            padding: 0.4rem 1rem;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.85rem;
+            padding: 0.6rem 1.3rem;
+            border-radius: 25px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            border: 2px solid rgba(16, 185, 129, 0.3);
         }
         
         .status-settled {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            background: rgba(100, 116, 139, 0.1);
-            color: #475569;
-            padding: 0.4rem 1rem;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 0.85rem;
+            gap: 0.6rem;
+            background: rgba(139, 92, 246, 0.15);
+            color: #6b21a8;
+            padding: 0.6rem 1.3rem;
+            border-radius: 25px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            border: 2px solid rgba(139, 92, 246, 0.3);
         }
         
         .status-dot {
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             background-color: currentColor;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
         </style>
     """, unsafe_allow_html=True)
@@ -300,38 +424,58 @@ def check_password():
 
     inject_custom_css()
     
-    # Centered login layout
-    col1, col2, col3 = st.columns([1, 1.2, 1])
-    with col2:
-        st.markdown("""
+    # Full-screen login layout
+    st.markdown("""
+        <div class='login-fullscreen'>
             <div class='login-container'>
                 <div class='login-header'>
-                    <div style='font-size: 3.5rem; margin-bottom: 1rem;'>🛡️</div>
+                    <div class='login-icon'>🛡️</div>
                     <h1 class='login-title'>Risk Intelligence Platform</h1>
-                    <p class='login-subtitle'>Enterprise-Grade Delinquency Analytics System</p>
-                    <div class='security-badge'>🔒 Secure Access Required</div>
+                    <p class='login-subtitle'>Enterprise Delinquency Analytics & Reporting System</p>
+                    <div class='security-badge'>🔒 256-bit Encrypted Access</div>
                 </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        u = st.text_input("Username", placeholder="Enter your username", label_visibility="collapsed", key="username_input")
-        st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
-        p = st.text_input("Password", type="password", placeholder="Enter your password", label_visibility="collapsed", key="password_input")
-        st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
-        
-        if st.button("🔐 Secure Login", use_container_width=True):
-            if u in st.secrets["passwords"] and p == st.secrets["passwords"][u]:
-                st.session_state["password_correct"] = True
-                st.rerun()
-            else:
-                st.error("❌ Invalid credentials. Please try again.")
-        
-        st.markdown("""
-                <div style='text-align: center; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e2e8f0;'>
-                    <p style='color: #94a3b8; font-size: 0.8rem;'>Protected by industry-standard encryption</p>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
+    u = st.text_input("👤 Username", placeholder="Enter your username", key="username_input")
+    st.markdown("<div style='height: 1rem;'></div>", unsafe_allow_html=True)
+    p = st.text_input("🔑 Password", type="password", placeholder="Enter your password", key="password_input")
+    st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
+    
+    if st.button("🔐 Sign In Securely", use_container_width=True, type="primary"):
+        if u in st.secrets["passwords"] and p == st.secrets["passwords"][u]:
+            st.session_state["password_correct"] = True
+            st.rerun()
+        else:
+            st.error("❌ Invalid credentials. Please check your username and password.")
+    
+    st.markdown("""
+                <div class='login-features'>
+                    <div class='feature-item'>
+                        <div class='feature-icon'>📊</div>
+                        <div class='feature-text'>Advanced Analytics</div>
+                    </div>
+                    <div class='feature-item'>
+                        <div class='feature-icon'>📋</div>
+                        <div class='feature-text'>PDF Reporting</div>
+                    </div>
+                    <div class='feature-item'>
+                        <div class='feature-icon'>🔒</div>
+                        <div class='feature-text'>Secure Access</div>
+                    </div>
+                    <div class='feature-item'>
+                        <div class='feature-icon'>⚡</div>
+                        <div class='feature-text'>Real-time Insights</div>
+                    </div>
+                </div>
+                
+                <div style='text-align: center; margin-top: 2.5rem; padding-top: 2rem; border-top: 1px solid #e2e8f0;'>
+                    <p style='color: #94a3b8; font-size: 0.85rem;'>© 2025 Risk Intelligence Platform. All rights reserved.</p>
+                    <p style='color: #cbd5e1; font-size: 0.75rem; margin-top: 0.5rem;'>Protected by industry-standard encryption and security protocols</p>
                 </div>
             </div>
-        """, unsafe_allow_html=True)
+        </div>
+    """, unsafe_allow_html=True)
     
     return False
 
@@ -583,7 +727,7 @@ if check_password():
     inject_custom_css()
 
     with st.sidebar:
-        st.markdown("<h2 style='color: #e2e8f0; margin-bottom: 2rem;'>🛡️ Risk Portal</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='color: #f3e8ff; margin-bottom: 2rem; text-shadow: 0 2px 4px rgba(0,0,0,0.3);'>🛡️ Risk Portal</h2>", unsafe_allow_html=True)
         
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.clear()
@@ -595,72 +739,91 @@ if check_password():
         if uploaded_file:
             st.markdown("<div style='height: 2rem;'></div>", unsafe_allow_html=True)
             st.markdown("---")
-            st.markdown("<h3 style='color: #e2e8f0;'>📚 Resources</h3>", unsafe_allow_html=True)
+            st.markdown("<h3 style='color: #f3e8ff;'>📚 Resources</h3>", unsafe_allow_html=True)
             
             with st.expander("📖 View Metrics Guide", expanded=False):
                 st.markdown("""
-                <div style='color: #cbd5e1; font-size: 0.85rem;'>
-                    <p><strong>Delinquency Density:</strong> Payment failure frequency</p>
-                    <p><strong>Maximum DPD:</strong> Highest risk point reached</p>
-                    <p><strong>Sticky Bucket:</strong> Regulatory risk category</p>
-                    <p><strong>Rolling 3M Avg:</strong> Trend smoothing indicator</p>
-                    <p><strong>Cumulative DPD:</strong> Total loss exposure</p>
+                <div style='color: #e9d5ff; font-size: 0.88rem; line-height: 1.6;'>
+                    <p><strong style='color: #faf5ff;'>Delinquency Density:</strong> Payment failure frequency</p>
+                    <p><strong style='color: #faf5ff;'>Maximum DPD:</strong> Highest risk point reached</p>
+                    <p><strong style='color: #faf5ff;'>Sticky Bucket:</strong> Regulatory risk category</p>
+                    <p><strong style='color: #faf5ff;'>Rolling 3M Avg:</strong> Trend smoothing indicator</p>
+                    <p><strong style='color: #faf5ff;'>Cumulative DPD:</strong> Total loss exposure</p>
                 </div>
                 """, unsafe_allow_html=True)
 
     if not uploaded_file:
         # LANDING PAGE
         st.markdown("""
-            <div style="background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.95) 100%); 
-                        padding: 4rem; border-radius: 24px; text-align: center; 
-                        border: 1px solid rgba(148, 163, 184, 0.2);
-                        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
-                <div style='font-size: 4rem; margin-bottom: 1rem;'>🛡️</div>
-                <h1 style="color: #0f172a; font-size: 3rem; font-weight: 700; margin-bottom: 1rem;">
+            <div style="background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(250,245,255,0.98) 100%); 
+                        padding: 5rem 3rem; border-radius: 28px; text-align: center; 
+                        border: 3px solid rgba(167, 139, 250, 0.3);
+                        box-shadow: 0 30px 60px -15px rgba(118, 75, 162, 0.4);">
+                <div style='font-size: 5rem; margin-bottom: 1.5rem;'>🛡️</div>
+                <h1 style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                           -webkit-background-clip: text;
+                           -webkit-text-fill-color: transparent;
+                           font-size: 3.5rem; font-weight: 800; margin-bottom: 1.5rem;">
                     Risk Intelligence Platform
                 </h1>
-                <p style="color: #64748b; font-size: 1.2rem; margin-bottom: 3rem; max-width: 700px; margin-left: auto; margin-right: auto;">
-                    Enterprise-grade delinquency analytics with automated PDF reporting and regulatory compliance metrics
+                <p style="color: #64748b; font-size: 1.3rem; margin-bottom: 3.5rem; max-width: 800px; margin-left: auto; margin-right: auto; line-height: 1.6;">
+                    Enterprise-grade delinquency analytics with automated PDF reporting, 
+                    regulatory compliance metrics, and real-time risk assessment
                 </p>
                 
-                <div style="display: flex; justify-content: center; gap: 2rem; margin-top: 4rem; flex-wrap: wrap;">
-                    <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); 
-                                padding: 2.5rem; border-radius: 20px; width: 300px; 
-                                border: 2px solid #bfdbfe;
-                                box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.1);">
-                        <div style='font-size: 2.5rem; margin-bottom: 1rem;'>📊</div>
-                        <h3 style="color: #1e40af; margin-bottom: 1rem; font-size: 1.3rem;">Advanced Analytics</h3>
-                        <p style="color: #64748b; font-size: 0.95rem; line-height: 1.6;">
-                            DPD density, delinquency episodes, sticky bucket classification, and trend analysis
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2.5rem; margin-top: 4rem; max-width: 1200px; margin-left: auto; margin-right: auto;">
+                    <div style="background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); 
+                                padding: 3rem 2rem; border-radius: 24px; 
+                                border: 2px solid #e9d5ff;
+                                box-shadow: 0 12px 24px -8px rgba(167, 139, 250, 0.3);
+                                transition: all 0.3s ease;">
+                        <div style='font-size: 3.5rem; margin-bottom: 1.5rem;'>📊</div>
+                        <h3 style="color: #6b21a8; margin-bottom: 1.2rem; font-size: 1.5rem; font-weight: 700;">Advanced Analytics Engine</h3>
+                        <p style="color: #64748b; font-size: 1rem; line-height: 1.7;">
+                            Calculate DPD density, delinquency episodes, sticky bucket classification, 
+                            and rolling averages with automated trend detection
                         </p>
                     </div>
                     
-                    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); 
-                                padding: 2.5rem; border-radius: 20px; width: 300px; 
-                                border: 2px solid #bbf7d0;
-                                box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.1);">
-                        <div style='font-size: 2.5rem; margin-bottom: 1rem;'>📋</div>
-                        <h3 style="color: #166534; margin-bottom: 1rem; font-size: 1.3rem;">PDF Reporting</h3>
-                        <p style="color: #64748b; font-size: 0.95rem; line-height: 1.6;">
-                            Professional reports with peak highlighting and comprehensive risk assessment
+                    <div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); 
+                                padding: 3rem 2rem; border-radius: 24px; 
+                                border: 2px solid #a7f3d0;
+                                box-shadow: 0 12px 24px -8px rgba(16, 185, 129, 0.3);
+                                transition: all 0.3s ease;">
+                        <div style='font-size: 3.5rem; margin-bottom: 1.5rem;'>📋</div>
+                        <h3 style="color: #065f46; margin-bottom: 1.2rem; font-size: 1.5rem; font-weight: 700;">Professional Reporting</h3>
+                        <p style="color: #64748b; font-size: 1rem; line-height: 1.7;">
+                            Generate publication-ready PDF reports with peak highlighting, 
+                            comprehensive metrics, and visual trend analysis
                         </p>
                     </div>
                     
                     <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); 
-                                padding: 2.5rem; border-radius: 20px; width: 300px; 
+                                padding: 3rem 2rem; border-radius: 24px; 
                                 border: 2px solid #fcd34d;
-                                box-shadow: 0 10px 15px -3px rgba(245, 158, 11, 0.1);">
-                        <div style='font-size: 2.5rem; margin-bottom: 1rem;'>🔒</div>
-                        <h3 style="color: #92400e; margin-bottom: 1rem; font-size: 1.3rem;">Secure Access</h3>
-                        <p style="color: #64748b; font-size: 0.95rem; line-height: 1.6;">
-                            Role-based authentication with encrypted data handling and audit trails
+                                box-shadow: 0 12px 24px -8px rgba(245, 158, 11, 0.3);
+                                transition: all 0.3s ease;">
+                        <div style='font-size: 3.5rem; margin-bottom: 1.5rem;'>🔒</div>
+                        <h3 style="color: #92400e; margin-bottom: 1.2rem; font-size: 1.5rem; font-weight: 700;">Enterprise Security</h3>
+                        <p style="color: #64748b; font-size: 1rem; line-height: 1.7;">
+                            Role-based authentication, encrypted data handling, 
+                            comprehensive audit trails, and compliance-ready access control
                         </p>
                     </div>
                 </div>
                 
-                <div style='margin-top: 5rem; padding-top: 2rem; border-top: 1px solid #e2e8f0;'>
-                    <p style='color: #94a3b8; font-size: 0.9rem; font-style: italic;'>
-                        ⬆️ Upload an Excel file via the sidebar to begin portfolio analysis
+                <div style='margin-top: 5rem; padding: 2.5rem; background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%); border-radius: 20px; border: 2px dashed #a78bfa;'>
+                    <p style='color: #6b21a8; font-size: 1.2rem; font-weight: 600; margin-bottom: 0.5rem;'>
+                        ⬆️ Ready to Begin Analysis?
+                    </p>
+                    <p style='color: #94a3b8; font-size: 1rem;'>
+                        Upload your Excel delinquency file via the sidebar to start processing loan accounts
+                    </p>
+                </div>
+                
+                <div style='margin-top: 3rem; padding-top: 2.5rem; border-top: 2px solid #e9d5ff;'>
+                    <p style='color: #a78bfa; font-size: 0.9rem; font-weight: 500;'>
+                        Powered by advanced risk analytics algorithms | Trusted by financial institutions
                     </p>
                 </div>
             </div>
@@ -757,7 +920,7 @@ if check_password():
 
         # Sidebar Downloads
         st.sidebar.markdown("---")
-        st.sidebar.markdown("<h3 style='color: #e2e8f0;'>💾 Bulk Downloads</h3>", unsafe_allow_html=True)
+        st.sidebar.markdown("<h3 style='color: #f3e8ff;'>💾 Bulk Downloads</h3>", unsafe_allow_html=True)
         st.sidebar.download_button(
             "📂 Excel (All Accounts)", 
             output_excel.getvalue(), 
