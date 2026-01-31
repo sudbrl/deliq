@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 import tempfile
@@ -26,7 +26,7 @@ def check_password():
         height: 100vh; display:flex; align-items:center; justify-content:center;
     }
     .login-card {
-        background:white; width:420px; padding:3rem;
+        background:white; width:420px; padding:1.5rem;  /* reduced padding */
         border-radius:16px; box-shadow:0 20px 45px rgba(0,0,0,.12);
         text-align:center;
     }
@@ -47,7 +47,7 @@ def check_password():
     return False
 
 # -------------------------------------------------
-# SAFE STAT FUNCTIONS (NO SCIPY / SKLEARN)
+# SAFE STAT FUNCTIONS
 # -------------------------------------------------
 def calc_skew(x):
     m = np.mean(x)
@@ -118,7 +118,14 @@ def analyze(row, months):
     df["Rolling_3M"] = df["DPD"].rolling(3).mean().fillna(0)
     max_dpd = dpd.max()
     max_month = df.loc[df["DPD"].idxmax(),"Month"]
-    return df, max_dpd, max_month
+    important_metrics = {
+        "Mean DPD": round(np.mean(dpd),2),
+        "Max DPD": int(max_dpd),
+        "Cumulative DPD": int(dpd.sum()),
+        "Trend Slope": round(calc_trend_slope(dpd),2),
+        "Sticky Bucket": "90+" if max_dpd>=90 else "60+" if max_dpd>=60 else "30+"
+    }
+    return df, max_dpd, max_month, important_metrics
 
 # -------------------------------------------------
 # CHART
@@ -128,8 +135,7 @@ def plot_chart(df, max_dpd, max_month):
     ax.plot(df["Month"], df["DPD"], marker="o")
     ax.plot(df["Month"], df["Rolling_3M"], linestyle="--")
     ax.plot(max_month, max_dpd, "r*", markersize=14)
-    ax.text(max_month, max_dpd+3, f"MAX {int(max_dpd)}",
-            ha="center", color="red")
+    ax.text(max_month, max_dpd+3, f"MAX {int(max_dpd)}", ha="center", color="red")
     plt.xticks(rotation=45)
     plt.tight_layout()
     return fig
@@ -137,18 +143,28 @@ def plot_chart(df, max_dpd, max_month):
 # -------------------------------------------------
 # PDF
 # -------------------------------------------------
-def build_pdf(story, code, df, max_dpd, max_month):
+def build_pdf(story, code, df, max_dpd, max_month, metrics):
+    styles = getSampleStyleSheet()
     story.append(Paragraph(
         f"Loan Performance – {code}",
-        ParagraphStyle(
-            "t", fontName="Helvetica-Bold",
-            fontSize=16, leading=18)))
+        ParagraphStyle("t", fontName="Helvetica-Bold", fontSize=16, leading=18)))
     story.append(Spacer(1,12))
 
-    fig_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
-    plot_chart(df,max_dpd,max_month).savefig(fig_path, dpi=150, bbox_inches="tight")
-    plt.close()
+    # Add important metrics table
+    data = [["Metric","Value"]]+[[k,v] for k,v in metrics.items()]
+    t = Table(data, colWidths=[3*inch,3*inch])
+    t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor("#1e3a8a")),
+                           ('TEXTCOLOR',(0,0),(-1,0),colors.white),
+                           ('GRID',(0,0),(-1,-1),0.5,colors.grey),
+                           ('FONTSIZE',(0,0),(-1,-1),10),
+                           ('ALIGN',(0,0),(-1,-1),'CENTER')]))
+    story.append(t)
+    story.append(Spacer(1,12))
 
+    # Add chart
+    fig_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+    plot_chart(df,max_dpd,max_month).savefig(fig_path,dpi=150,bbox_inches="tight")
+    plt.close()
     story.append(Image(fig_path,6.5*inch,3.2*inch))
     story.append(PageBreak())
 
@@ -179,26 +195,22 @@ if check_password():
             tabs = st.tabs([str(c) for c in codes])
             for tab, code in zip(tabs, codes):
                 row = raw[raw.iloc[:,0]==code].iloc[0]
-                df, max_dpd, max_month = analyze(row, months)
+                df, max_dpd, max_month, metrics = analyze(row, months)
 
+                # Excel sheets
                 df.to_excel(writer, f"DATA_{code}", index=False)
-                build_excel_metrics(df["DPD"]).to_excel(
-                    writer, f"METRICS_{code}", index=False)
+                build_excel_metrics(df["DPD"]).to_excel(writer, f"METRICS_{code}", index=False)
 
+                # Screen
                 with tab:
                     st.subheader(f"Account {code}")
-                    st.pyplot(plot_chart(df, max_dpd, max_month))
+                    st.table(pd.DataFrame(metrics.items(), columns=["Metric","Value"]))
+                    st.pyplot(plot_chart(df,max_dpd,max_month))
 
-                build_pdf(story, code, df, max_dpd, max_month)
+                # PDF
+                build_pdf(story, code, df, max_dpd, max_month, metrics)
 
             doc.build(story)
 
-        st.sidebar.download_button(
-            "📊 Download Excel",
-            excel_buf.getvalue(),
-            "Risk_Metrics.xlsx")
-
-        st.sidebar.download_button(
-            "📦 Download PDF",
-            pdf_buf.getvalue(),
-            "Risk_Report.pdf")
+        st.sidebar.download_button("📊 Download Excel", excel_buf.getvalue(), "Risk_Metrics.xlsx")
+        st.sidebar.download_button("📦 Download PDF", pdf_buf.getvalue(), "Risk_Report.pdf")
