@@ -26,7 +26,7 @@ def check_password():
     if st.session_state.auth:
         return True
 
-    # ✅ PROFESSIONAL LOGIN UI - CENTERED & COMPACT
+    # ✅ PROFESSIONAL LOGIN UI
     st.markdown("""
     <style>
     /* Gradient Background */
@@ -73,14 +73,14 @@ def check_password():
     </style>
     """, unsafe_allow_html=True)
 
-    # Vertical Spacer to center vertically
+    # Vertical Spacer
     st.write("")
     st.write("")
     st.write("")
     st.write("")
     st.write("")
 
-    # Columns to center horizontally (narrow middle column prevents stretching)
+    # Columns to center horizontally
     col1, col2, col3 = st.columns([1, 0.6, 1]) 
 
     with col2:
@@ -298,7 +298,7 @@ def build_pdf(story, code, df, max_dpd, max_month, metrics):
 # -------------------- MAIN APP --------------------
 if check_password():
     
-    # Apply professional styling
+    # Apply professional styling with SIDEBAR VISIBILITY FIXES
     st.markdown("""
     <style>
     /* Professional app styling */
@@ -330,28 +330,55 @@ if check_password():
     /* Sidebar styling */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #1e293b 0%, #334155 100%);
+        color: white;
     }
     
-    [data-testid="stSidebar"] * {
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] label, [data-testid="stSidebar"] p {
         color: white !important;
     }
     
-    /* Download buttons */
-    .stDownloadButton button {
+    /* Download buttons (keep gradient) */
+    [data-testid="stSidebar"] .stDownloadButton button {
         width: 100%;
         background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-        color: white;
+        color: white !important;
         font-weight: 600;
         border: none;
         padding: 12px;
         border-radius: 8px;
     }
     
-    /* File uploader */
-    [data-testid="stFileUploader"] {
-        background-color: rgba(255, 255, 255, 0.1);
+    /* --- FIX: File Uploader --- */
+    /* Make the container transparent/dashed so it blends with dark sidebar */
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px dashed rgba(255, 255, 255, 0.3);
         border-radius: 12px;
         padding: 1rem;
+    }
+    /* Ensure the internal text is white */
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] small {
+        color: #cbd5e1 !important;
+    }
+    /* Ensure the internal 'Browse files' button has dark text so it shows on white button */
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] button {
+        color: #1e293b !important; 
+        background-color: white !important;
+        border: none;
+    }
+
+    /* --- FIX: Logout Button --- */
+    /* Make logout button outlined/transparent to work on dark sidebar */
+    [data-testid="stSidebar"] .stButton button {
+        width: 100%;
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        color: white !important;
+        padding: 8px;
+    }
+    [data-testid="stSidebar"] .stButton button:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: white;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -362,7 +389,7 @@ if check_password():
         st.markdown("### Enterprise Analytics Platform")
         st.markdown("---")
 
-        # 1. FILE UPLOAD (Moved to Sidebar)
+        # 1. FILE UPLOAD
         st.markdown("### 📁 Data Input")
         file = st.file_uploader("Upload Portfolio Excel", type=["xlsx"], help="Upload Excel file with DPD data")
         
@@ -404,10 +431,9 @@ if check_password():
                     row = raw[raw.iloc[:, 0] == code].iloc[0]
                     df, max_dpd, max_month, metrics = analyze(row, months)
                     
-                    # Excel sheets
+                    # Excel sheets (REMOVED SEASONALITY SHEET)
                     df.to_excel(writer, f"DATA_{code}", index=False)
                     build_excel_metrics(df["DPD"], months).to_excel(writer, f"METRICS_{code}", index=False)
-                    build_seasonality_sheet(df["DPD"], months).to_excel(writer, f"SEASONALITY_{code}", index=False)
                     
                     # Display in app
                     with tab:
@@ -435,7 +461,7 @@ if check_password():
             
             doc.build(story)
             
-            # -------------------- DOWNLOADS (Moved to Sidebar) --------------------
+            # -------------------- DOWNLOADS --------------------
             with st.sidebar:
                 st.markdown("---")
                 st.markdown("### 💾 Downloads")
