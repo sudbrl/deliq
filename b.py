@@ -10,7 +10,7 @@ from reportlab.lib.units import inch
 from reportlab.lib import colors
 import tempfile
 
-# Must be the first Streamlit command
+# 1. Page Configuration
 st.set_page_config(
     page_title="Risk Analytics Platform",
     page_icon="🛡️",
@@ -19,72 +19,60 @@ st.set_page_config(
 )
 
 # -------------------------------------------------
-# STYLING - Rectified for Visibility
+# STYLING - Restored & Rectified for Contrast
 # -------------------------------------------------
 def apply_custom_styling():
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
-        
         * { font-family: 'Poppins', sans-serif; }
         
-        /* Lightened Background for better text visibility */
+        /* Background fix for readability */
         .stApp {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            color: #212529;
+            background-color: #f4f7f9;
+            color: #1a1a2e;
         }
 
-        /* Sidebar Visibility */
-        [data-testid="stSidebar"] {
-            background-color: #1a1a2e !important;
-        }
-        
-        /* Modern Tab Styling */
+        /* Modern Pill Tabs */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 10px;
-            background-color: transparent;
+            gap: 8px;
+            background-color: #e2e8f0;
+            padding: 6px;
+            border-radius: 12px;
         }
-
         .stTabs [data-baseweb="tab"] {
-            height: 45px;
-            white-space: pre-wrap;
-            background-color: #ffffff;
-            border-radius: 10px;
-            color: #495057;
-            border: 1px solid #dee2e6;
-            padding: 10px 20px;
+            background-color: transparent;
+            border-radius: 8px;
+            color: #475569;
+            font-weight: 500;
         }
-
         .stTabs [aria-selected="true"] {
-            background: #667eea !important;
+            background-color: #4f46e5 !important;
             color: white !important;
-            border: none !important;
         }
 
-        /* Metric Box with high contrast */
+        /* Metric Cards */
         .metric-box {
             background: white;
-            padding: 1.5rem;
-            border-radius: 12px;
-            color: #1a1a2e;
-            border: 1px solid #dee2e6;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            padding: 1.2rem;
+            border-radius: 15px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
             margin-bottom: 1rem;
         }
-
         .login-box {
             background: white;
             padding: 3rem;
             border-radius: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            max-width: 450px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
             margin: auto;
+            max-width: 450px;
         }
         </style>
     """, unsafe_allow_html=True)
 
 # -------------------------------------------------
-# ANALYTICS ENGINE
+# CORE ANALYTICS
 # -------------------------------------------------
 def analyze_loan(row, months):
     dpd = row[months].astype(object)
@@ -107,31 +95,28 @@ def analyze_loan(row, months):
     
     max_d = active_dpd.max()
     metrics = [
-        ("Loan Status", "Settled" if end_pos < len(months)-1 else "Active", "State"),
-        ("Max DPD", f"{int(max_d)}", "Peak"),
-        ("Density", f"{(active_dpd > 0).sum()/len(active_dpd):.1%}", "Freq")
+        ("Loan Status", "Settled" if end_pos < len(months)-1 else "Active", "Status"),
+        ("Max DPD", f"{int(max_d)} Days", "Peak Risk"),
+        ("Density", f"{(active_dpd > 0).sum()/len(active_dpd):.1%}", "Frequency")
     ]
     return df, pd.DataFrame(metrics, columns=["Metric", "Value", "Importance"])
 
 # -------------------------------------------------
-# PDF & CHARTING (Annotated)
+# CHARTING WITH HIGHLIGHTING
 # -------------------------------------------------
-def create_annotated_chart(df, is_pdf=False):
+def get_annotated_plot(df, is_pdf=False):
     plot_df = df[df["Status"] != "Not Disbursed"].reset_index()
     fig, ax = plt.subplots(figsize=(10, 4), dpi=100)
     
-    # Chart Styling
-    line_color = "#667eea"
-    ax.plot(plot_df.index, plot_df["DPD"], marker="o", color=line_color, linewidth=2, label="DPD")
+    ax.plot(plot_df.index, plot_df["DPD"], marker="o", color="#4f46e5", linewidth=2, label="DPD")
     
     if not plot_df.empty and plot_df["DPD"].max() > 0:
-        peak_idx = plot_df["DPD"].idxmax()
-        peak_val = plot_df["DPD"].max()
-        # Highlight Max Point
-        ax.scatter(peak_idx, peak_val, color='#ef4444', s=100, zorder=5, edgecolors='black')
-        ax.annotate(f'MAX: {int(peak_val)}', (peak_idx, peak_val), 
-                   xytext=(0, 10), textcoords='offset points', 
-                   ha='center', fontweight='bold', color='#ef4444')
+        p_idx = plot_df["DPD"].idxmax()
+        p_val = plot_df["DPD"].max()
+        # Highlight point
+        ax.scatter(p_idx, p_val, color='red', s=120, zorder=5, edgecolors='black')
+        ax.annotate(f'PEAK: {int(p_val)}', (p_idx, p_val), xytext=(0, 10), 
+                    textcoords='offset points', ha='center', weight='bold', color='red')
     
     ax.set_xticks(range(len(plot_df)))
     ax.set_xticklabels(plot_df["Month"], rotation=45)
@@ -145,92 +130,86 @@ def create_annotated_chart(df, is_pdf=False):
     return fig
 
 # -------------------------------------------------
-# AUTH & MAIN
+# AUTHENTICATION
 # -------------------------------------------------
 def check_password():
     if "authenticated" not in st.session_state: st.session_state.authenticated = False
     if st.session_state.authenticated: return True
     apply_custom_styling()
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    _, col2, _ = st.columns([1, 1.5, 1])
-    with col2:
-        st.markdown("<div class='login-box'><h2 style='text-align:center'>🛡️ Risk Login</h2>", unsafe_allow_html=True)
-        u = st.text_input("User")
+    _, col, _ = st.columns([1, 1.5, 1])
+    with col:
+        st.markdown("<div class='login-box'><h2 style='text-align:center'>🛡️ Risk Portal</h2>", unsafe_allow_html=True)
+        u = st.text_input("Username")
         p = st.text_input("Password", type="password")
         if st.button("Sign In", use_container_width=True):
             if "passwords" in st.secrets and u in st.secrets["passwords"] and p == st.secrets["passwords"][u]:
                 st.session_state.authenticated = True
                 st.rerun()
-            elif u == "admin" and p == "admin": # Local Fallback
+            elif u == "admin" and p == "admin": # Default fallback
                 st.session_state.authenticated = True
                 st.rerun()
-            else: st.error("Invalid")
+            else: st.error("Access Denied")
     return False
 
+# -------------------------------------------------
+# MAIN APP
+# -------------------------------------------------
 if check_password():
     apply_custom_styling()
     with st.sidebar:
-        st.title("🛡️ Controls")
+        st.title("🛡️ Risk Analytics")
         if st.button("Logout"): 
             st.session_state.authenticated = False
             st.rerun()
-        uploaded_file = st.file_uploader("Upload Data", type=["xlsx"])
+        uploaded_file = st.file_uploader("Upload Delinquency File", type=["xlsx"])
 
     if not uploaded_file:
-        st.markdown("<div class='login-box' style='max-width:800px; text-align:center'><h1>Welcome</h1><p>Upload Excel to start.</p></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align:center; padding-top:100px;'><h1>Ready for Analysis</h1><p>Upload your Excel file to begin.</p></div>", unsafe_allow_html=True)
     else:
         raw_data = pd.read_excel(uploaded_file)
         codes = raw_data.iloc[:, 0].unique()
         months = raw_data.columns[3:]
         
-        # Buffer for Excel with Metrics
         output_excel = BytesIO()
         bulk_metrics = []
         
         with pd.ExcelWriter(output_excel, engine='xlsxwriter') as writer:
             tabs = st.tabs([f"A/C {c}" for c in codes])
             
-            bulk_pdf_buf = BytesIO()
-            doc = SimpleDocTemplate(bulk_pdf_buf, pagesize=letter)
-            story = []
-            styles = getSampleStyleSheet()
-
             for tab, code in zip(tabs, codes):
                 row = raw_data[raw_data.iloc[:, 0] == code].iloc[0]
                 df, metrics_df = analyze_loan(row, months)
                 
-                # Save to Excel Sheets
+                # Build metric record for Excel summary sheet
+                m_record = metrics_df.set_index('Metric')['Value'].to_dict()
+                m_record['Account_Code'] = code
+                bulk_metrics.append(m_record)
+                
+                # Write individual account data to Excel
                 df.to_excel(writer, sheet_name=str(code)[:31], index=False)
                 
-                # Collect for Summary Sheet
-                m_row = metrics_df.set_index('Metric')['Value'].to_dict()
-                m_row['Account'] = code
-                bulk_metrics.append(m_row)
-                
                 with tab:
-                    st.markdown(f"### Account Analysis: {code}")
-                    # Metrics UI
-                    m_cols = st.columns(3)
-                    for i, (idx, m_r) in enumerate(metrics_df.iterrows()):
-                        m_cols[i].markdown(f"<div class='metric-box'><b>{m_r['Metric']}</b><br>{m_r['Value']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"### Performance: {code}")
+                    cols = st.columns(3)
+                    for i, (idx, m_row) in enumerate(metrics_df.iterrows()):
+                        cols[i].markdown(f"<div class='metric-box'><b>{m_row['Metric']}</b><br>{m_row['Value']}</div>", unsafe_allow_html=True)
                     
-                    # Chart with Highlighting
-                    st.pyplot(create_annotated_chart(df))
+                    st.pyplot(get_annotated_plot(df))
                     
-                    # Individual PDF
-                    ind_buf = BytesIO()
-                    ind_doc = SimpleDocTemplate(ind_buf, pagesize=letter)
-                    ind_story = []
-                    
-                    # Build PDF with Annotation
-                    ind_story.append(Paragraph(f"Report: {code}", styles['Heading1']))
-                    ind_story.append(Image(create_annotated_chart(df, True), width=6*inch, height=2.5*inch))
-                    ind_doc.build(ind_story)
-                    
-                    st.download_button(f"📥 Download PDF {code}", ind_buf.getvalue(), f"{code}.pdf")
+                    # Individual PDF Report with Highlight
+                    pdf_buf = BytesIO()
+                    doc = SimpleDocTemplate(pdf_buf, pagesize=letter)
+                    styles = getSampleStyleSheet()
+                    story = [
+                        Paragraph(f"Risk Report: {code}", styles['Heading1']),
+                        Spacer(1, 12),
+                        Image(get_annotated_plot(df, True), width=6*inch, height=2.5*inch)
+                    ]
+                    doc.build(story)
+                    st.download_button(f"📥 PDF Report {code}", pdf_buf.getvalue(), f"{code}.pdf")
 
-            # Create Summary Metrics Sheet in Excel
+            # Finalize Excel Summary Metrics Sheet
             pd.DataFrame(bulk_metrics).to_excel(writer, sheet_name="Summary_Metrics", index=False)
 
         st.sidebar.markdown("---")
-        st.sidebar.download_button("📂 Export All (Excel)", output_excel.getvalue(), "Portfolio_Report.xlsx")
+        st.sidebar.download_button("📂 Bulk Export (Excel)", output_excel.getvalue(), "Risk_Analysis_Complete.xlsx")
