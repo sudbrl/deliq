@@ -55,12 +55,12 @@ def check_password():
         st.markdown('</div>', unsafe_allow_html=True)
     return False
 
-# -------------------- ADVANCED ANALYTICS ENGINE --------------------
+# -------------------- ANALYTICS ENGINE --------------------
 def get_advanced_metrics(dpd_series):
     dpd = dpd_series.values.astype(float)
     nonzero = dpd[dpd > 0]
     
-    # 1. Time to Cure (Avg months to return to 0)
+    # Time to Cure (Avg months to return to 0)
     cure_times = []
     current_streak = 0
     in_delinquency = False
@@ -74,12 +74,12 @@ def get_advanced_metrics(dpd_series):
             in_delinquency = False
     avg_cure = round(np.mean(cure_times), 1) if cure_times else 0
 
-    # 2. Peak-to-Trough Ratio
+    # Peak-to-Trough Ratio
     max_dpd = np.max(dpd)
     min_nonzero = np.min(nonzero) if len(nonzero) > 0 else 0
     p2t_ratio = round(max_dpd / min_nonzero, 2) if min_nonzero > 0 else 0
 
-    # 3. Consecutive Miss Count (Max)
+    # Consecutive Miss Count
     max_misses = 0
     temp_misses = 0
     for val in dpd:
@@ -89,18 +89,17 @@ def get_advanced_metrics(dpd_series):
             temp_misses = 0
     max_misses = max(max_misses, temp_misses)
 
-    # 4. Recency (Months since last DPD > 0)
+    # Recency (Clean months at end of series)
     recency = 0
     for i in range(len(dpd)-1, -1, -1):
         if dpd[i] > 0: break
         recency += 1
-    if np.sum(dpd) == 0: recency = len(dpd)
 
-    # 5. Bounce Rate (0 -> >0 transitions)
+    # Bounce Rate (Transitions from 0 to >0)
     bounces = sum(1 for i in range(1, len(dpd)) if dpd[i-1] == 0 and dpd[i] > 0)
     bounce_rate = round((bounces / len(dpd)) * 100, 1)
 
-    # 6. Roll Rate (Probability DPD increases)
+    # Roll Rate (Probability DPD increases)
     rolls = sum(1 for i in range(1, len(dpd)) if dpd[i] > dpd[i-1] and dpd[i-1] > 0)
     roll_rate = round((rolls / len(nonzero) * 100), 1) if len(nonzero) > 0 else 0
 
@@ -127,7 +126,8 @@ def analyze(row, months):
     metrics = {
         "Mean DPD": round(np.mean(dpd), 2),
         "Max DPD": int(np.max(dpd)),
-        "Trend": round(calc_trend_slope(dpd), 2),
+        "Cumulative DPD": int(np.sum(dpd)),
+        "Trend Slope": round(calc_trend_slope(dpd), 2),
         **adv
     }
     return df, metrics
@@ -163,30 +163,33 @@ if check_password():
             st.rerun()
 
     if not file:
-        st.markdown('<div class="hero-section"><h1>Portfolio Analytics</h1><p>Upload your portfolio in the sidebar to generate advanced indicators.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="hero-section"><h1>Advanced Risk Analytics</h1><p>Upload portfolio data to calculate multi-dimensional credit indicators.</p></div>', unsafe_allow_html=True)
     else:
         try:
             raw = pd.read_excel(file)
             codes = raw.iloc[:, 0].unique()
             months = raw.columns[3:]
-            
             excel_buf = BytesIO()
-            
-            # Metric Definitions for the extra sheet
-            definitions = [
+
+            # COMPREHENSIVE GLOSSARY SHEET DATA
+            glossary_data = [
                 ["Metric", "Definition", "Interpretation"],
-                ["Time to Cure", "Average months taken to return to 0 DPD after a delinquency event.", "Lower is better; indicates fast recovery."],
-                ["Peak-to-Trough", "Ratio of highest DPD to the lowest non-zero DPD.", "High values indicate high volatility in repayment behavior."],
-                ["Consecutive Misses", "The longest streak of months where DPD was greater than zero.", "High streaks indicate 'sticky' delinquency or default risk."],
-                ["Recency", "Number of consecutive months at 0 DPD leading up to the current date.", "Higher values indicate a stabilizing account."],
-                ["Bounce Rate", "Percentage of months where an account 'bounced' from Current to Delinquent.", "Indicates inconsistent cashflow or 'habitual' lateness."],
-                ["Roll-Forward Rate", "Percentage of delinquent months where DPD increased from the previous month.", "Indicates a worsening credit position (rolling to deeper buckets)."]
+                ["Mean DPD", "The arithmetic average of DPD across the entire time series.", "General level of delinquency over time."],
+                ["Max DPD", "The single highest DPD value recorded in the history.", "Maximum exposure/loss potential reached."],
+                ["Cumulative DPD", "The sum total of all DPD values recorded.", "Total aggregate volume of delinquency."],
+                ["Trend Slope", "Linear regression slope of DPD over time.", "Positive (>0) means worsening; Negative (<0) means improving."],
+                ["Avg Time to Cure", "The average number of months an account stays delinquent before returning to zero.", "Indicates recovery speed. Lower is better."],
+                ["Peak-to-Trough", "Ratio of Max DPD to the lowest non-zero DPD observed.", "Measures severity/volatility of delinquency spikes."],
+                ["Max Consecutive Misses", "The longest continuous streak of delinquent months.", "Indicator of 'sticky' delinquency or imminent default."],
+                ["Recency (Clean Mo)", "Count of zero-DPD months immediately preceding the report date.", "Higher values indicate a stabilizing or recovered account."],
+                ["Bounce Rate (%)", "Frequency of transitions from 'Current' to 'Delinquent' as a % of total months.", "High bounce indicates habitual lateness or cashflow instability."],
+                ["Roll-Forward Rate (%)", "Probability that DPD will increase from the previous month given the account is already delinquent.", "High roll-rate indicates a 'downward spiral' toward default."]
             ]
-            df_defs = pd.DataFrame(definitions[1:], columns=definitions[0])
+            df_glossary = pd.DataFrame(glossary_data[1:], columns=glossary_data[0])
 
             with pd.ExcelWriter(excel_buf, engine="xlsxwriter") as writer:
-                # 1. Definitions Sheet
-                df_defs.to_excel(writer, "Metric Definitions", index=False)
+                # 1. Definitions / Glossary Sheet
+                df_glossary.to_excel(writer, "Metric Definitions", index=False)
                 
                 tabs = st.tabs([f"Account {c}" for c in codes])
                 for tab, code in zip(tabs, codes):
@@ -196,10 +199,10 @@ if check_password():
                     with tab:
                         cl, cr = st.columns([1, 2])
                         with cl:
-                            st.subheader("Indicators")
+                            st.subheader("Key Indicators")
                             for k, v in metrics.items(): st.metric(k, v)
                         with cr:
-                            st.subheader("DPD Trend")
+                            st.subheader("Delinquency Trend")
                             st.pyplot(plot_chart(df))
                         
                         full_metrics_df = pd.DataFrame(list(metrics.items()), columns=["Metric", "Value"])
@@ -211,7 +214,7 @@ if check_password():
 
             with st.sidebar:
                 st.markdown("### 💾 Export Reports")
-                st.download_button("📊 Download Advanced Excel", excel_buf.getvalue(), "Risk_Analysis_Pro.xlsx", use_container_width=True)
+                st.download_button("📊 Download Portfolio Report", excel_buf.getvalue(), "Risk_Analysis_Full.xlsx", use_container_width=True)
                 
         except Exception as e:
             st.error(f"Error processing file: {e}")
