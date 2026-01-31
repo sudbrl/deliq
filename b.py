@@ -8,7 +8,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Page
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 import tempfile
-from sklearn.linear_model import LinearRegression
 
 # -------------------------------------------------
 # AUTH
@@ -48,7 +47,7 @@ def check_password():
     return False
 
 # -------------------------------------------------
-# SAFE STAT FUNCTIONS (NO SCIPY)
+# SAFE STAT FUNCTIONS (NO SCIPY / SKLEARN)
 # -------------------------------------------------
 def calc_skew(x):
     m = np.mean(x)
@@ -63,15 +62,19 @@ def calc_kurtosis(x):
 def calc_mode(x):
     return pd.Series(x).mode().iloc[0]
 
+def calc_trend_slope(y):
+    x = np.arange(len(y))
+    x_mean = x.mean()
+    y_mean = y.mean()
+    num = np.sum((x - x_mean) * (y - y_mean))
+    den = np.sum((x - x_mean) ** 2)
+    return num / den if den != 0 else 0
+
 # -------------------------------------------------
 # METRICS ENGINE (EXCEL)
 # -------------------------------------------------
 def build_excel_metrics(dpd_series):
     dpd = dpd_series.values.astype(float)
-    t = np.arange(len(dpd)).reshape(-1, 1)
-
-    lr = LinearRegression().fit(t, dpd)
-    slope = lr.coef_[0]
 
     metrics = [
         ["Mean DPD", round(np.mean(dpd),2), "Average delinquency per month"],
@@ -88,7 +91,8 @@ def build_excel_metrics(dpd_series):
         ["Proportion Delinquent", round((dpd>0).mean(),2), "Share delinquent"],
 
         ["Cumulative DPD", int(dpd.sum()), "Life exposure"],
-        ["Trend Slope", round(slope,2), "Momentum"],
+        ["Trend Slope (DPD/mo)", round(calc_trend_slope(dpd),2), "Momentum"],
+
         ["Autocorr Lag 1",
          round(np.corrcoef(dpd[:-1],dpd[1:])[0,1],2) if len(dpd)>1 else 0,
          "Persistence"],
@@ -97,6 +101,7 @@ def build_excel_metrics(dpd_series):
         ["Coeff of Variation",
          round(np.std(dpd)/np.mean(dpd),2) if np.mean(dpd)>0 else 0,
          "Relative volatility"],
+
         ["Sticky Bucket",
          "90+" if np.max(dpd)>=90 else "60+" if np.max(dpd)>=60 else "30+",
          "Historical severity"]
@@ -133,17 +138,15 @@ def plot_chart(df, max_dpd, max_month):
 # PDF
 # -------------------------------------------------
 def build_pdf(story, code, df, max_dpd, max_month):
-    styles = getSampleStyleSheet()
     story.append(Paragraph(
         f"Loan Performance – {code}",
-        ParagraphStyle("t", fontName="Helvetica-Bold",
-                       fontSize=16, leading=18)))
+        ParagraphStyle(
+            "t", fontName="Helvetica-Bold",
+            fontSize=16, leading=18)))
     story.append(Spacer(1,12))
 
-    fig_path = tempfile.NamedTemporaryFile(
-        delete=False, suffix=".png").name
-    plot_chart(df,max_dpd,max_month).savefig(
-        fig_path, dpi=150, bbox_inches="tight")
+    fig_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+    plot_chart(df,max_dpd,max_month).savefig(fig_path, dpi=150, bbox_inches="tight")
     plt.close()
 
     story.append(Image(fig_path,6.5*inch,3.2*inch))
@@ -169,24 +172,24 @@ if check_password():
 
         excel_buf = BytesIO()
         pdf_buf = BytesIO()
-        doc = SimpleDocTemplate(pdf_buf,pagesize=letter)
+        doc = SimpleDocTemplate(pdf_buf, pagesize=letter)
         story = []
 
-        with pd.ExcelWriter(excel_buf,engine="xlsxwriter") as writer:
+        with pd.ExcelWriter(excel_buf, engine="xlsxwriter") as writer:
             tabs = st.tabs([str(c) for c in codes])
-            for tab, code in zip(tabs,codes):
+            for tab, code in zip(tabs, codes):
                 row = raw[raw.iloc[:,0]==code].iloc[0]
-                df, max_dpd, max_month = analyze(row,months)
+                df, max_dpd, max_month = analyze(row, months)
 
-                df.to_excel(writer,f"DATA_{code}",index=False)
+                df.to_excel(writer, f"DATA_{code}", index=False)
                 build_excel_metrics(df["DPD"]).to_excel(
-                    writer,f"METRICS_{code}",index=False)
+                    writer, f"METRICS_{code}", index=False)
 
                 with tab:
                     st.subheader(f"Account {code}")
-                    st.pyplot(plot_chart(df,max_dpd,max_month))
+                    st.pyplot(plot_chart(df, max_dpd, max_month))
 
-                build_pdf(story,code,df,max_dpd,max_month)
+                build_pdf(story, code, df, max_dpd, max_month)
 
             doc.build(story)
 
