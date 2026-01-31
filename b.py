@@ -26,101 +26,83 @@ def check_password():
     if st.session_state.auth:
         return True
 
-    # ✅ PROFESSIONAL LOGIN UI - NO GAPS
+    # ✅ PROFESSIONAL LOGIN UI - CENTERED & COMPACT
     st.markdown("""
     <style>
-    /* Remove all default Streamlit padding */
-    .main .block-container {
-        padding: 0 !important;
-        max-width: 100% !important;
-    }
-    
-    header, footer {
-        visibility: hidden !important;
-    }
-    
-    #MainMenu {
-        visibility: hidden !important;
-    }
-    
-    /* Full height login wrapper */
-    .login-page {
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    /* Gradient Background */
+    .stApp {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        margin: 0;
-        padding: 0;
     }
     
-    /* Modern login card */
-    .login-card {
-        background: white;
-        width: 400px;
-        padding: 2.5rem;
+    /* Hide Navbar/Footer */
+    header, footer { visibility: hidden !important; }
+    
+    /* Login Card Container Styling */
+    div[data-testid="stVerticalBlock"] > div[style*="flex-direction: column;"] > div[data-testid="stVerticalBlock"] {
+        background-color: white;
+        padding: 3rem;
         border-radius: 20px;
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.3);
     }
     
-    .login-header {
-        text-align: center;
-        margin-bottom: 2rem;
+    /* Input Fields Styling */
+    .stTextInput input {
+        border: 1px solid #e2e8f0;
+        padding: 10px;
+        border-radius: 8px;
     }
     
-    .login-logo {
-        font-size: 3rem;
-        margin-bottom: 0.5rem;
+    /* Button Styling */
+    .stButton button {
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 12px;
+        font-weight: bold;
+        border-radius: 8px;
+        width: 100%;
+        transition: all 0.3s ease;
     }
-    
-    .login-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #1e293b;
-        margin: 0;
+    .stButton button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
     }
-    
-    .login-subtitle {
-        font-size: 0.875rem;
-        color: #64748b;
-        margin-top: 0.25rem;
-    }
-    
-    /* Hide Streamlit elements on login page */
-    [data-testid="stSidebar"] {
-        display: none;
-    }
+
+    /* Hide Sidebar on Login */
+    [data-testid="stSidebar"] { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
-    # Login UI
-    st.markdown('<div class="login-page">', unsafe_allow_html=True)
-    st.markdown('''
-    <div class="login-card">
-        <div class="login-header">
-            <div class="login-logo">🛡️</div>
-            <h1 class="login-title">Risk Intelligence</h1>
-            <p class="login-subtitle">Enterprise Credit Risk Analytics Platform</p>
-        </div>
-    </div>
-    ''', unsafe_allow_html=True)
-    
-    # Streamlit inputs (will appear inside the card)
-    col1, col2, col3 = st.columns([0.5, 3, 0.5])
+    # Vertical Spacer to center vertically
+    st.write("")
+    st.write("")
+    st.write("")
+    st.write("")
+    st.write("")
+
+    # Columns to center horizontally (narrow middle column prevents stretching)
+    col1, col2, col3 = st.columns([1, 0.6, 1]) 
+
     with col2:
-        username = st.text_input("Username", placeholder="Enter username", label_visibility="collapsed", key="username_input")
-        password = st.text_input("Password", type="password", placeholder="Enter password", label_visibility="collapsed", key="password_input")
+        # Header inside the card
+        st.markdown("<h1 style='text-align: center; color: #1e293b; margin-bottom: 0;'>🛡️ Risk Intel</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: #64748b; margin-top: 5px; margin-bottom: 30px;'>Enterprise Credit Analytics</p>", unsafe_allow_html=True)
         
-        if st.button("🔐 Sign In", use_container_width=True, type="primary"):
+        # Inputs
+        username = st.text_input("Username", placeholder="Username", label_visibility="collapsed")
+        password = st.text_input("Password", type="password", placeholder="Password", label_visibility="collapsed")
+        
+        st.write("") # Gap
+        
+        if st.button("Sign In", use_container_width=True):
             if username in st.secrets.get("passwords", {}) and password == st.secrets["passwords"][username]:
                 st.session_state.auth = True
                 st.rerun()
             else:
                 st.error("❌ Invalid credentials")
         
-        st.caption("🔒 Secure access • Enterprise grade encryption")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; color: #94a3b8; font-size: 0.8rem; margin-top: 20px;'>🔒 Secure Enterprise Access</div>", unsafe_allow_html=True)
+
     return False
 
 # -------------------- SAFE STAT FUNCTIONS --------------------
@@ -367,34 +349,39 @@ if check_password():
     
     /* File uploader */
     [data-testid="stFileUploader"] {
-        background-color: white;
+        background-color: rgba(255, 255, 255, 0.1);
         border-radius: 12px;
         padding: 1rem;
-        border: 2px dashed #cbd5e1;
     }
     </style>
     """, unsafe_allow_html=True)
     
-    # Sidebar
+    # -------------------- SIDEBAR --------------------
     with st.sidebar:
         st.markdown("# 🛡️ Risk Intelligence")
         st.markdown("### Enterprise Analytics Platform")
         st.markdown("---")
-        
-        if st.button("🚪 Logout", use_container_width=True):
-            st.session_state.clear()
-            st.rerun()
+
+        # 1. FILE UPLOAD (Moved to Sidebar)
+        st.markdown("### 📁 Data Input")
+        file = st.file_uploader("Upload Portfolio Excel", type=["xlsx"], help="Upload Excel file with DPD data")
         
         st.markdown("---")
+        
+        # 2. STATUS
         st.markdown("### 📊 System Status")
         st.success("✅ System Online")
         st.info("📅 " + pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"))
+
+        # 3. LOGOUT (Bottom)
+        st.markdown("---")
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
     
-    # Main content
+    # -------------------- MAIN CONTENT --------------------
     st.title("📊 Credit Risk Analytics Dashboard")
-    st.markdown("Upload your portfolio data to generate comprehensive risk metrics and insights.")
-    
-    file = st.file_uploader("📁 Upload Portfolio Excel File", type=["xlsx"], help="Upload Excel file with DPD data")
+    st.markdown("View comprehensive risk metrics, seasonality patterns, and trend analysis for your portfolio.")
     
     if file:
         try:
@@ -448,23 +435,23 @@ if check_password():
             
             doc.build(story)
             
-            # Download section
-            st.markdown("---")
-            st.markdown("### 💾 Download Reports")
-            
-            col1, col2, col3 = st.columns([1, 1, 2])
-            with col1:
+            # -------------------- DOWNLOADS (Moved to Sidebar) --------------------
+            with st.sidebar:
+                st.markdown("---")
+                st.markdown("### 💾 Downloads")
+                
                 st.download_button(
-                    "📊 Download Excel Report",
+                    "📊 Excel Report",
                     excel_buf.getvalue(),
                     "Risk_Metrics_Report.xlsx",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True
                 )
-            
-            with col2:
+                
+                st.write("") # small gap
+                
                 st.download_button(
-                    "📄 Download PDF Report",
+                    "📄 PDF Report",
                     pdf_buf.getvalue(),
                     "Risk_Analysis_Report.pdf",
                     "application/pdf",
@@ -477,11 +464,11 @@ if check_password():
     
     else:
         # Welcome message when no file uploaded
-        st.info("👆 Upload an Excel file to begin analysis")
+        st.info("👆 Please upload an Excel file in the sidebar to begin analysis")
         
-        with st.expander("📖 How to use this platform"):
+        with st.expander("📖 How to use this platform", expanded=True):
             st.markdown("""
-            **Step 1:** Upload your portfolio Excel file
+            **Step 1:** Upload your portfolio Excel file using the sidebar.
             - Column 1: Account codes
             - Columns 4+: Monthly DPD values
             
@@ -490,13 +477,7 @@ if check_password():
             - Visual trend analysis
             - Complete risk assessment
             
-            **Step 3:** Download comprehensive reports
+            **Step 3:** Download comprehensive reports (Sidebar)
             - Excel: Detailed metrics + seasonality analysis
             - PDF: Executive summary report
-            
-            **Features:**
-            - 23+ risk metrics including seasonality patterns
-            - Automated trend analysis
-            - Visual dashboards
-            - Export-ready reports
             """)
