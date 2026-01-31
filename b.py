@@ -7,7 +7,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.lib import colors  # ✅ fix for NameError
+from reportlab.lib import colors
 import tempfile
 
 # -------------------- AUTH --------------------
@@ -17,16 +17,28 @@ def check_password():
     if st.session_state.auth:
         return True
 
+    # removed extra space/padding at top
     st.markdown("""
     <style>
-    section.main > div { padding-top: 0rem; }
-    .stApp { background: radial-gradient(circle at top, #eef2ff, #f8fafc); }
+    section.main > div:first-child { padding-top: 0rem !important; }
+    .block-container { padding-top: 0rem !important; }
+    header {visibility: hidden;}
+    .stApp {
+        background: radial-gradient(circle at top, #eef2ff, #f8fafc);
+    }
     .login-wrapper {
-        height: 100vh; display:flex; align-items:center; justify-content:center;
+        height:100vh;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        margin:0;
     }
     .login-card {
-        background:white; width:420px; padding:1.5rem;
-        border-radius:16px; box-shadow:0 20px 45px rgba(0,0,0,.12);
+        background:white;
+        width:420px;
+        padding:1.5rem;
+        border-radius:16px;
+        box-shadow:0 20px 45px rgba(0,0,0,.12);
         text-align:center;
     }
     </style>
@@ -36,14 +48,17 @@ def check_password():
     st.markdown("### 🛡️ Risk Intelligence Portal")
     u = st.text_input("Username")
     p = st.text_input("Password", type="password")
+
     if st.button("Sign in", use_container_width=True):
         if u in st.secrets["passwords"] and p == st.secrets["passwords"][u]:
             st.session_state.auth = True
             st.rerun()
         else:
             st.error("Invalid credentials")
+
     st.markdown("</div></div>", unsafe_allow_html=True)
     return False
+
 
 # -------------------- SAFE STAT FUNCTIONS --------------------
 def calc_skew(x):
@@ -67,58 +82,86 @@ def calc_trend_slope(y):
     den = np.sum((x - x_mean) ** 2)
     return num / den if den != 0 else 0
 
+
+# -------------------- SEASONALITY ENGINE --------------------
+def build_seasonality(df):
+    s = df["DPD"].values
+    mean_val = np.mean(s)
+
+    df_seas = df.copy()
+    df_seas["MoM_Change"] = df_seas["DPD"].diff().fillna(0)
+    df_seas["MA_3"] = df_seas["DPD"].rolling(3).mean().fillna(0)
+    df_seas["MA_6"] = df_seas["DPD"].rolling(6).mean().fillna(0)
+    df_seas["Season_Index"] = df_seas["DPD"] / mean_val if mean_val != 0 else 0
+
+    if len(s) >= 12:
+        lag12 = np.corrcoef(s[:-12], s[12:])[0, 1]
+    else:
+        lag12 = 0
+
+    amplitude = df_seas["Season_Index"].max() - df_seas["Season_Index"].min()
+    coef_season = df_seas["Season_Index"].std()
+
+    summary = pd.DataFrame([
+        ["Lag 12 Autocorr", round(lag12, 3), "Annual seasonality strength (>0.5 strong)"],
+        ["Seasonal Amplitude", round(amplitude, 3), "Peak minus trough index"],
+        ["Seasonal Coefficient", round(coef_season, 3), "Volatility of seasonal pattern"],
+        ["Peak Month", df_seas.loc[df_seas["Season_Index"].idxmax(), "Month"], "Highest relative risk"],
+        ["Trough Month", df_seas.loc[df_seas["Season_Index"].idxmin(), "Month"], "Lowest relative risk"]
+    ], columns=["Metric", "Value", "Interpretation"])
+
+    return df_seas, summary
+
+
+def build_formula_examples():
+    rows = [
+        ["Purpose", "Excel Formula Example", "Interpretation"],
+        ["Mean", "=AVERAGE(B2:B13)", "Baseline delinquency"],
+        ["Season Index", "=B2/$B$14", ">1 worse month, <1 better"],
+        ["3M Moving Avg", "=AVERAGE(B2:B4)", "Short smoothing"],
+        ["6M Moving Avg", "=AVERAGE(B2:B7)", "Medium smoothing"],
+        ["MoM Change", "=B3-B2", "Acceleration/slowdown"],
+        ["Lag12 Corr", "=CORREL(B2:B13,B14:B25)", "Annual seasonality strength"],
+        ["Amplitude", "=MAX(C2:C13)-MIN(C2:C13)", "Size of seasonal swing"]
+    ]
+    return pd.DataFrame(rows)
+
+
 # -------------------- METRICS ENGINE --------------------
 def build_excel_metrics(dpd_series):
     dpd = dpd_series.values.astype(float)
 
     metrics = [
-        ["Mean DPD", round(np.mean(dpd),2), "Average delinquency per month"],
-        ["Median DPD", int(np.median(dpd)), "50% months below"],
-        ["Mode DPD", int(calc_mode(dpd)), "Most frequent"],
-        ["Min DPD", int(np.min(dpd)), "Best month"],
-        ["Max DPD", int(np.max(dpd)), "Worst month"],
-        ["Range", int(np.ptp(dpd)), "Spread"],
+        ["Mean DPD", round(np.mean(dpd),2), "Average delinquency"],
+        ["Median DPD", int(np.median(dpd)), "Middle value"],
         ["Std Deviation", round(np.std(dpd,ddof=1),2), "Volatility"],
         ["Skewness", round(calc_skew(dpd),2), "Right tail risk"],
-        ["Kurtosis", round(calc_kurtosis(dpd),2), "Extreme events"],
-
-        ["Delinquent Months", int((dpd>0).sum()), "Frequency"],
-        ["Proportion Delinquent", round((dpd>0).mean(),2), "Share delinquent"],
-
-        ["Cumulative DPD", int(dpd.sum()), "Life exposure"],
-        ["Trend Slope (DPD/mo)", round(calc_trend_slope(dpd),2), "Momentum"],
-
+        ["Trend Slope", round(calc_trend_slope(dpd),2), "Up/down momentum"],
         ["Autocorr Lag 1",
          round(np.corrcoef(dpd[:-1],dpd[1:])[0,1],2) if len(dpd)>1 else 0,
-         "Persistence"],
-
-        ["Prob 90+ DPD", round((dpd>=90).mean(),3), "Extreme risk"],
-        ["Coeff of Variation",
-         round(np.std(dpd)/np.mean(dpd),2) if np.mean(dpd)>0 else 0,
-         "Relative volatility"],
-
-        ["Sticky Bucket",
-         "90+" if np.max(dpd)>=90 else "60+" if np.max(dpd)>=60 else "30+",
-         "Historical severity"]
+         "Short-term persistence"]
     ]
 
     return pd.DataFrame(metrics, columns=["Metric","Value","Interpretation"])
+
 
 # -------------------- ANALYSIS --------------------
 def analyze(row, months):
     dpd = row[months].astype(float).fillna(0)
     df = pd.DataFrame({"Month": months.astype(str), "DPD": dpd})
     df["Rolling_3M"] = df["DPD"].rolling(3).mean().fillna(0)
+
     max_dpd = dpd.max()
     max_month = df.loc[df["DPD"].idxmax(),"Month"]
-    important_metrics = {
+
+    metrics = {
         "Mean DPD": round(np.mean(dpd),2),
         "Max DPD": int(max_dpd),
-        "Cumulative DPD": int(dpd.sum()),
-        "Trend Slope": round(calc_trend_slope(dpd),2),
-        "Sticky Bucket": "90+" if max_dpd>=90 else "60+" if max_dpd>=60 else "30+"
+        "Trend Slope": round(calc_trend_slope(dpd),2)
     }
-    return df, max_dpd, max_month, important_metrics
+
+    return df, max_dpd, max_month, metrics
+
 
 # -------------------- CHART --------------------
 def plot_chart(df, max_dpd, max_month):
@@ -126,39 +169,14 @@ def plot_chart(df, max_dpd, max_month):
     ax.plot(df["Month"], df["DPD"], marker="o")
     ax.plot(df["Month"], df["Rolling_3M"], linestyle="--")
     ax.plot(max_month, max_dpd, "r*", markersize=14)
-    ax.text(max_month, max_dpd+3, f"MAX {int(max_dpd)}", ha="center", color="red")
     plt.xticks(rotation=45)
     plt.tight_layout()
     return fig
 
-# -------------------- PDF --------------------
-def build_pdf(story, code, df, max_dpd, max_month, metrics):
-    styles = getSampleStyleSheet()
-    story.append(Paragraph(
-        f"Loan Performance – {code}",
-        ParagraphStyle("t", fontName="Helvetica-Bold", fontSize=16, leading=18)))
-    story.append(Spacer(1,12))
-
-    # Important metrics table
-    data = [["Metric","Value"]]+[[k,v] for k,v in metrics.items()]
-    t = Table(data, colWidths=[3*inch,3*inch])
-    t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor("#1e3a8a")),
-                           ('TEXTCOLOR',(0,0),(-1,0),colors.white),
-                           ('GRID',(0,0),(-1,-1),0.5,colors.grey),
-                           ('FONTSIZE',(0,0),(-1,-1),10),
-                           ('ALIGN',(0,0),(-1,-1),'CENTER')]))
-    story.append(t)
-    story.append(Spacer(1,12))
-
-    # Chart
-    fig_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
-    plot_chart(df,max_dpd,max_month).savefig(fig_path,dpi=150,bbox_inches="tight")
-    plt.close()
-    story.append(Image(fig_path,6.5*inch,3.2*inch))
-    story.append(PageBreak())
 
 # -------------------- APP --------------------
 if check_password():
+
     st.set_page_config("Risk Portal", layout="wide")
 
     with st.sidebar:
@@ -179,25 +197,29 @@ if check_password():
         story = []
 
         with pd.ExcelWriter(excel_buf, engine="xlsxwriter") as writer:
+
+            build_formula_examples().to_excel(writer, "FORMULAS_EXAMPLE", index=False)
+
             tabs = st.tabs([str(c) for c in codes])
+
             for tab, code in zip(tabs, codes):
+
                 row = raw[raw.iloc[:,0]==code].iloc[0]
+
                 df, max_dpd, max_month, metrics = analyze(row, months)
 
-                # Excel
+                # seasonality
+                seas_df, seas_summary = build_seasonality(df)
+
                 df.to_excel(writer, f"DATA_{code}", index=False)
                 build_excel_metrics(df["DPD"]).to_excel(writer, f"METRICS_{code}", index=False)
+                seas_df.to_excel(writer, f"SEASONALITY_{code}", index=False)
+                seas_summary.to_excel(writer, f"SEASONAL_SUMMARY_{code}", index=False)
 
-                # Screen
                 with tab:
                     st.subheader(f"Account {code}")
                     st.table(pd.DataFrame(metrics.items(), columns=["Metric","Value"]))
                     st.pyplot(plot_chart(df,max_dpd,max_month))
-
-                # PDF
-                build_pdf(story, code, df, max_dpd, max_month, metrics)
-
-            doc.build(story)
 
         st.sidebar.download_button("📊 Download Excel", excel_buf.getvalue(), "Risk_Metrics.xlsx")
         st.sidebar.download_button("📦 Download PDF", pdf_buf.getvalue(), "Risk_Report.pdf")
