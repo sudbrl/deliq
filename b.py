@@ -10,7 +10,7 @@ from reportlab.lib import colors
 import tempfile
 
 # -------------------------------------------------
-# 1. AUTHENTICATION (DTI STYLE)
+# 1. AUTHENTICATION – CENTERED WITH LOGO
 # -------------------------------------------------
 def check_password():
     if "auth" not in st.session_state:
@@ -22,9 +22,9 @@ def check_password():
     st.markdown("""
     <style>
     .stApp {
-        background: linear-gradient(180deg,#f8fafc,#eef2ff);
+        background: radial-gradient(circle at top, #eef2ff, #f8fafc);
     }
-    .login-wrap {
+    .login-wrapper {
         min-height: 100vh;
         display: flex;
         align-items: center;
@@ -33,29 +33,36 @@ def check_password():
     .login-card {
         background: white;
         width: 420px;
-        padding: 2.8rem;
-        border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0,0,0,.08);
+        padding: 3rem 2.8rem;
+        border-radius: 16px;
+        box-shadow: 0 20px 45px rgba(0,0,0,0.12);
         border: 1px solid #e5e7eb;
+        text-align: center;
     }
-    .login-title {
-        font-size: 1.5rem;
+    .logo {
+        font-size: 3.2rem;
+        margin-bottom: 0.5rem;
+    }
+    .app-title {
+        font-size: 1.6rem;
         font-weight: 600;
-        text-align: center;
         color: #111827;
+        margin-bottom: 0.2rem;
     }
-    .login-sub {
-        font-size: .9rem;
-        text-align: center;
+    .app-subtitle {
+        font-size: 0.9rem;
         color: #6b7280;
-        margin-bottom: 2rem;
+        margin-bottom: 2.2rem;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown("<div class='login-wrap'><div class='login-card'>", unsafe_allow_html=True)
-    st.markdown("<div class='login-title'>Risk Intelligence</div>", unsafe_allow_html=True)
-    st.markdown("<div class='login-sub'>Secure Analytics Portal</div>", unsafe_allow_html=True)
+    st.markdown("<div class='login-wrapper'><div class='login-card'>", unsafe_allow_html=True)
+
+    # Fancy logo (emoji-based, enterprise-safe)
+    st.markdown("<div class='logo'>🛡️</div>", unsafe_allow_html=True)
+    st.markdown("<div class='app-title'>Risk Intelligence</div>", unsafe_allow_html=True)
+    st.markdown("<div class='app-subtitle'>Secure Analytics Portal</div>", unsafe_allow_html=True)
 
     u = st.text_input("Username")
     p = st.text_input("Password", type="password")
