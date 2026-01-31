@@ -7,11 +7,10 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
+from reportlab.lib import colors  # ✅ fix for NameError
 import tempfile
 
-# -------------------------------------------------
-# AUTH
-# -------------------------------------------------
+# -------------------- AUTH --------------------
 def check_password():
     if "auth" not in st.session_state:
         st.session_state.auth = False
@@ -26,7 +25,7 @@ def check_password():
         height: 100vh; display:flex; align-items:center; justify-content:center;
     }
     .login-card {
-        background:white; width:420px; padding:1.5rem;  /* reduced padding */
+        background:white; width:420px; padding:1.5rem;
         border-radius:16px; box-shadow:0 20px 45px rgba(0,0,0,.12);
         text-align:center;
     }
@@ -46,9 +45,7 @@ def check_password():
     st.markdown("</div></div>", unsafe_allow_html=True)
     return False
 
-# -------------------------------------------------
-# SAFE STAT FUNCTIONS
-# -------------------------------------------------
+# -------------------- SAFE STAT FUNCTIONS --------------------
 def calc_skew(x):
     m = np.mean(x)
     s = np.std(x, ddof=1)
@@ -70,9 +67,7 @@ def calc_trend_slope(y):
     den = np.sum((x - x_mean) ** 2)
     return num / den if den != 0 else 0
 
-# -------------------------------------------------
-# METRICS ENGINE (EXCEL)
-# -------------------------------------------------
+# -------------------- METRICS ENGINE --------------------
 def build_excel_metrics(dpd_series):
     dpd = dpd_series.values.astype(float)
 
@@ -109,9 +104,7 @@ def build_excel_metrics(dpd_series):
 
     return pd.DataFrame(metrics, columns=["Metric","Value","Interpretation"])
 
-# -------------------------------------------------
-# ANALYSIS
-# -------------------------------------------------
+# -------------------- ANALYSIS --------------------
 def analyze(row, months):
     dpd = row[months].astype(float).fillna(0)
     df = pd.DataFrame({"Month": months.astype(str), "DPD": dpd})
@@ -127,9 +120,7 @@ def analyze(row, months):
     }
     return df, max_dpd, max_month, important_metrics
 
-# -------------------------------------------------
-# CHART
-# -------------------------------------------------
+# -------------------- CHART --------------------
 def plot_chart(df, max_dpd, max_month):
     fig, ax = plt.subplots(figsize=(10,3.5))
     ax.plot(df["Month"], df["DPD"], marker="o")
@@ -140,9 +131,7 @@ def plot_chart(df, max_dpd, max_month):
     plt.tight_layout()
     return fig
 
-# -------------------------------------------------
-# PDF
-# -------------------------------------------------
+# -------------------- PDF --------------------
 def build_pdf(story, code, df, max_dpd, max_month, metrics):
     styles = getSampleStyleSheet()
     story.append(Paragraph(
@@ -150,7 +139,7 @@ def build_pdf(story, code, df, max_dpd, max_month, metrics):
         ParagraphStyle("t", fontName="Helvetica-Bold", fontSize=16, leading=18)))
     story.append(Spacer(1,12))
 
-    # Add important metrics table
+    # Important metrics table
     data = [["Metric","Value"]]+[[k,v] for k,v in metrics.items()]
     t = Table(data, colWidths=[3*inch,3*inch])
     t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor("#1e3a8a")),
@@ -161,16 +150,14 @@ def build_pdf(story, code, df, max_dpd, max_month, metrics):
     story.append(t)
     story.append(Spacer(1,12))
 
-    # Add chart
+    # Chart
     fig_path = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
     plot_chart(df,max_dpd,max_month).savefig(fig_path,dpi=150,bbox_inches="tight")
     plt.close()
     story.append(Image(fig_path,6.5*inch,3.2*inch))
     story.append(PageBreak())
 
-# -------------------------------------------------
-# APP
-# -------------------------------------------------
+# -------------------- APP --------------------
 if check_password():
     st.set_page_config("Risk Portal", layout="wide")
 
@@ -197,7 +184,7 @@ if check_password():
                 row = raw[raw.iloc[:,0]==code].iloc[0]
                 df, max_dpd, max_month, metrics = analyze(row, months)
 
-                # Excel sheets
+                # Excel
                 df.to_excel(writer, f"DATA_{code}", index=False)
                 build_excel_metrics(df["DPD"]).to_excel(writer, f"METRICS_{code}", index=False)
 
