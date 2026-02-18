@@ -431,9 +431,10 @@ if check_password():
                     row = raw[raw.iloc[:, 0] == code].iloc[0]
                     df, max_dpd, max_month, metrics = analyze(row, months)
                     
-                    # Excel sheets (REMOVED SEASONALITY SHEET)
+                    # Excel sheets (SEASONALITY SHEET ADDED BACK)
                     df.to_excel(writer, f"DATA_{code}", index=False)
                     build_excel_metrics(df["DPD"], months).to_excel(writer, f"METRICS_{code}", index=False)
+                    build_seasonality_sheet(df["DPD"], months).to_excel(writer, f"SEASONALITY_{code}", index=False)
                     
                     # Display in app
                     with tab:
@@ -458,7 +459,19 @@ if check_password():
                     
                     # PDF
                     build_pdf(story, code, df, max_dpd, max_month, metrics)
-            
+                
+                # ADDING GLOBAL DEFINITIONS SHEET FROM USER IMAGE
+                definitions_data = [
+                    ["Hard Cures", "DPD > 0 → 0", "Account returns to 0 DPD from delinquency"],
+                    ["Delinquency", "Contiguous DPD > 0", "Consecutive months with payments missed"],
+                    ["Cure Rate", "Cures / Episodes", "Ratio of successful recoveries to delinquent events"],
+                    ["Avg Time-to-Cure", "Months to reach 0 DPD", "Average duration to resolve a delinquency"],
+                    ["Sustained Cure", "3-month stay at 0 DPD", "Verification of stable payment behavior"],
+                    ["Recurrence", "Re-default after cure", "Account returns to >0 DPD after being cured"]
+                ]
+                def_df = pd.DataFrame(definitions_data, columns=["Metric", "Logic/Formula", "Description"])
+                def_df.to_excel(writer, "Metrics_Definitions", index=False)
+
             doc.build(story)
             
             # -------------------- DOWNLOADS --------------------
@@ -504,6 +517,6 @@ if check_password():
             - Complete risk assessment
             
             **Step 3:** Download comprehensive reports (Sidebar)
-            - Excel: Detailed metrics + seasonality analysis
+            - Excel: Detailed metrics + seasonality analysis + logic definitions
             - PDF: Executive summary report
             """)
