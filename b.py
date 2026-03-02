@@ -193,6 +193,19 @@ if check_password():
     [data-testid="stSidebar"] [data-testid="stFileUploader"] {
         background-color: rgba(255, 255, 255, 0.05); border: 1px dashed rgba(255, 255, 255, 0.3);
     }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section {
+        background-color: rgba(30, 41, 59, 0.6) !important;
+        border: 1px dashed rgba(255, 255, 255, 0.3) !important;
+        border-radius: 8px;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] section button {
+        background-color: rgba(59, 130, 246, 0.8) !important;
+        color: white !important;
+        border: none !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] small {
+        color: rgba(255, 255, 255, 0.7) !important;
+    }
     </style>
     """, unsafe_allow_html=True)
     
