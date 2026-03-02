@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from matplotlib.patches import Rectangle
-import os
-import tempfile
 from io import BytesIO
+import tempfile
+import os
 
 # -------------------- PAGE CONFIG --------------------
 st.set_page_config(
@@ -35,13 +35,19 @@ def check_password():
     .stButton button {
         background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
         color: white; border: none; padding: 12px; font-weight: bold; border-radius: 8px; width: 100%;
+        transition: all 0.3s ease;
     }
+    .stButton button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
     [data-testid="stSidebar"] { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
     st.write("")
     st.write("")
+    st.write("")
+    st.write("")
+    st.write("")
+
     col1, col2, col3 = st.columns([1, 0.6, 1]) 
 
     with col2:
@@ -51,35 +57,106 @@ def check_password():
         username = st.text_input("Username", placeholder="Username", label_visibility="collapsed")
         password = st.text_input("Password", type="password", placeholder="Password", label_visibility="collapsed")
         
+        st.write("")
+        
         if st.button("Sign In", use_container_width=True):
             if username in st.secrets.get("passwords", {}) and password == st.secrets["passwords"][username]:
                 st.session_state.auth = True
                 st.rerun()
             else:
                 st.error("❌ Invalid credentials")
+        
         st.markdown("<div style='text-align: center; color: #94a3b8; font-size: 0.8rem; margin-top: 20px;'>🔒 Secure Enterprise Access</div>", unsafe_allow_html=True)
 
     return False
 
-# -------------------- ANALYTICS HELPERS --------------------
+# -------------------- ORIGINAL STAT FUNCTIONS --------------------
 def calc_skew(x):
-    m, s = np.mean(x), np.std(x, ddof=1)
+    m = np.mean(x)
+    s = np.std(x, ddof=1)
     return np.mean(((x - m) / s) ** 3) if s != 0 else 0
 
 def calc_kurtosis(x):
-    m, s = np.mean(x), np.std(x, ddof=1)
+    m = np.mean(x)
+    s = np.std(x, ddof=1)
     return np.mean(((x - m) / s) ** 4) if s != 0 else 0
+
+def calc_mode(x):
+    mode_result = pd.Series(x).mode()
+    return mode_result.iloc[0] if len(mode_result) > 0 else 0
 
 def calc_trend_slope(y):
     x = np.arange(len(y))
-    x_mean, y_mean = x.mean(), y.mean()
+    x_mean = x.mean()
+    y_mean = y.mean()
     num = np.sum((x - x_mean) * (y - y_mean))
     den = np.sum((x - x_mean) ** 2)
     return num / den if den != 0 else 0
 
-# -------------------- INFOGRAPHIC CHART ENGINE --------------------
-def generate_delinquency_chart_bytes(excel_file_path):
-    """Generates the professional dark-themed PNG and returns it as bytes."""
+# -------------------- ORIGINAL SEASONALITY FUNCTIONS --------------------
+def calc_monthly_avg(dpd, months):
+    month_data = {}
+    for i, m in enumerate(months):
+        month_str = str(m)
+        if '-' in month_str:
+            try: month_num = int(month_str.split('-')[1])
+            except: month_num = (i % 12) + 1
+        else:
+            month_num = (i % 12) + 1
+        if month_num not in month_data: month_data[month_num] = []
+        month_data[month_num].append(dpd[i])
+    return {k: np.mean(v) for k, v in month_data.items()}
+
+def calc_seasonality_index(dpd, months):
+    monthly_avg = calc_monthly_avg(dpd, months)
+    overall_avg = np.mean(list(monthly_avg.values()))
+    return {k: (v / overall_avg * 100) if overall_avg > 0 else 100 for k, v in monthly_avg.items()}
+
+def calc_seasonal_strength(dpd, months):
+    monthly_avg = calc_monthly_avg(dpd, months)
+    if len(monthly_avg) < 2: return 0
+    values = list(monthly_avg.values())
+    return np.std(values) / np.mean(values) if np.mean(values) > 0 else 0
+
+# -------------------- ORIGINAL METRICS ENGINE --------------------
+def build_excel_metrics(dpd_series, months):
+    dpd = dpd_series.values.astype(float)
+    seasonality_idx = calc_seasonality_index(dpd, months)
+    seasonal_strength = calc_seasonal_strength(dpd, months)
+    peak_month = max(seasonality_idx, key=seasonality_idx.get) if seasonality_idx else 0
+    trough_month = min(seasonality_idx, key=seasonality_idx.get) if seasonality_idx else 0
+    
+    metrics = [
+        ["Mean DPD", round(np.mean(dpd), 2), "Average delinquency per month"],
+        ["Median DPD", int(np.median(dpd)), "50% months below this value"],
+        ["Mode DPD", int(calc_mode(dpd)), "Most frequent DPD value"],
+        ["Min DPD", int(np.min(dpd)), "Best performing month"],
+        ["Max DPD", int(np.max(dpd)), "Worst performing month"],
+        ["Range", int(np.ptp(dpd)), "Max - Min spread"],
+        ["Std Deviation", round(np.std(dpd, ddof=1), 2), "Payment volatility measure"],
+        ["Skewness", round(calc_skew(dpd), 2), "Right tail risk (>0 = outlier delays)"],
+        ["Kurtosis", round(calc_kurtosis(dpd), 2), "Extreme event risk (>3 = fat tails)"],
+        ["Delinquent Months", int((dpd > 0).sum()), "Number of months with delays"],
+        ["Proportion Delinquent", round((dpd > 0).mean(), 2), "% of months delinquent"],
+        ["Cumulative DPD", int(dpd.sum()), "Total lifetime exposure"],
+        ["Trend Slope (DPD/mo)", round(calc_trend_slope(dpd), 2), "Monthly change rate"],
+        ["Autocorr Lag 1", round(np.corrcoef(dpd[:-1], dpd[1:])[0, 1], 2) if len(dpd) > 1 else 0, "Month-to-month persistence"],
+        ["Prob 90+ DPD", round((dpd >= 90).mean(), 3), "Severe delinquency probability"],
+        ["Coeff of Variation", round(np.std(dpd) / np.mean(dpd), 2) if np.mean(dpd) > 0 else 0, "Relative volatility"],
+        ["Sticky Bucket", "90+" if np.max(dpd) >= 90 else "60+" if np.max(dpd) >= 60 else "30+" if np.max(dpd) >= 30 else "Current", "Worst historical bucket"],
+        ["", "", ""],
+        ["--- SEASONALITY ---", "", ""],
+        ["Seasonal Strength", round(seasonal_strength, 3), "Pattern strength (>0.3 = strong)"],
+        ["Peak Season Month", peak_month, "Month with highest avg DPD"],
+        ["Trough Season Month", trough_month, "Month with lowest avg DPD"],
+        ["Peak Index", round(seasonality_idx.get(peak_month, 100), 1) if seasonality_idx else 100, "Peak vs average (100 = avg)"],
+        ["Trough Index", round(seasonality_idx.get(trough_month, 100), 1) if seasonality_idx else 100, "Trough vs average (100 = avg)"],
+        ["Seasonal Amplitude", round(seasonality_idx.get(peak_month, 100) - seasonality_idx.get(trough_month, 100), 1) if seasonality_idx else 0, "Peak - Trough difference"],
+    ]
+    return pd.DataFrame(metrics, columns=["Metric", "Value", "Interpretation"])
+
+# -------------------- INFOGRAPHIC CHART LOGIC --------------------
+def generate_delinquency_infographic(excel_file_path):
     df = pd.read_excel(excel_file_path)
     month_columns = df.columns[3:].tolist()
     
@@ -88,93 +165,82 @@ def generate_delinquency_chart_bytes(excel_file_path):
     ax = fig.add_subplot(111)
     ax.set_facecolor('#1e1e1e')
     
-    colors = ['#00d4ff', '#ff006e', '#06ffa5', '#ffbe0b', '#8b5cf6', '#ec4899']
+    colors = ['#00d4ff', '#ff006e', '#06ffa5', '#ffbe0b']
     loan_info = []
     
     for idx, (_, row) in enumerate(df.iterrows()):
-        loan_type = row.iloc[0] # Ac Type Desc
-        balance = row.iloc[2]   # Balance
-        dpd_values = row[month_columns].astype(float).fillna(0).tolist()
+        loan_type = row.iloc[0]
+        balance = row.iloc[2]
+        dpd_values = [float(row[m]) if pd.notna(row[m]) else 0 for m in month_columns]
         month_positions = list(range(len(month_columns)))
         
         color = colors[idx % len(colors)]
-        
         if dpd_values:
             for glow in [8, 6, 4, 2]:
                 ax.plot(month_positions, dpd_values, color=color, linewidth=glow, alpha=0.15, zorder=1)
             
-            ax.plot(month_positions, dpd_values, color=color, linewidth=3, label=str(loan_type), 
-                    marker='o', markersize=5, markerfacecolor=color, markeredgecolor='#2b2b2b', 
-                    markeredgewidth=2, zorder=3)
+            ax.plot(month_positions, dpd_values, color=color, linewidth=3, label=loan_type, marker='o', 
+                    markersize=5, markerfacecolor=color, markeredgecolor='#2b2b2b', markeredgewidth=2, zorder=3)
             
             max_dpd = max(dpd_values)
             max_idx = dpd_values.index(max_dpd)
-            
-            loan_info.append({'type': loan_type, 'balance': balance, 'max_dpd': int(max_dpd), 
-                              'max_month': month_columns[max_idx], 'color': color})
+            loan_info.append({'type': loan_type, 'balance': balance, 'max_dpd': int(max_dpd), 'max_month': month_columns[max_idx], 'color': color})
             
             ax.plot(max_idx, max_dpd, 'o', color=color, markersize=12, markeredgecolor='white', markeredgewidth=3, zorder=6)
-            ax.annotate(f'{int(max_dpd)} DAYS\n{month_columns[max_idx]}', xy=(max_idx, max_dpd),
-                        xytext=(20, 20), textcoords='offset points', fontsize=10, fontweight='bold',
-                        bbox=dict(boxstyle='round,pad=0.8', facecolor='#2b2b2b', alpha=0.95, edgecolor=color, linewidth=3),
+            ax.annotate(f'{int(max_dpd)} DAYS\n{month_columns[max_idx]}', xy=(max_idx, max_dpd), xytext=(20, 20), textcoords='offset points',
+                        fontsize=10, fontweight='bold', bbox=dict(boxstyle='round,pad=0.8', facecolor='#2b2b2b', alpha=0.95, edgecolor=color, linewidth=3),
                         color=color, arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.2', color=color, lw=3), zorder=8)
 
     ax.grid(True, alpha=0.15, linestyle='-', linewidth=1.5, color='#00d4ff')
     for spine in ax.spines.values(): spine.set_visible(False)
-    
     ax.set_xlabel('LOAN PERIOD', fontsize=15, fontweight='bold', color='#00d4ff', labelpad=15)
     ax.set_ylabel('DAYS PAST DUE (DPD)', fontsize=15, fontweight='bold', color='#00d4ff', labelpad=15)
     fig.text(0.5, 0.96, 'LOAN DELINQUENCY INFOGRAPHIC', fontsize=24, fontweight='bold', color='white', ha='center')
-    
     ax.set_xticks(range(len(month_columns)))
     ax.set_xticklabels(month_columns, rotation=45, ha='right', fontsize=9, color='#a8dadc', fontweight='bold')
     ax.tick_params(axis='both', colors='#a8dadc')
 
-    # Portfolio Panel
+    # Panel
     panel = Rectangle((0.77, 0.15), 0.21, 0.65, transform=fig.transFigure, facecolor='#0f0f0f', alpha=0.95, edgecolor='#00d4ff', linewidth=3, zorder=10)
     fig.add_artist(panel)
     fig.text(0.875, 0.77, 'PORTFOLIO STATUS', fontsize=14, fontweight='bold', color='white', ha='center', transform=fig.transFigure, zorder=11)
     
     y_off = 0.69
-    for info in loan_info[:8]: # Limit display to first 8 for space
-        fig.text(0.79, y_off, f"● {info['type']}", fontsize=9, fontweight='bold', color=info['color'], transform=fig.transFigure, zorder=11)
-        fig.text(0.79, y_off-0.025, f"Balance: Rs.{info['balance']:,.0f} | Peak: {info['max_dpd']}d", fontsize=8, color='white', transform=fig.transFigure, zorder=11)
-        y_off -= 0.06
+    for info in loan_info:
+        fig.text(0.79, y_off, f"● {info['type']}", fontsize=10, fontweight='bold', color=info['color'], transform=fig.transFigure, zorder=11)
+        y_off -= 0.03
+        fig.text(0.79, y_off, f"BALANCE: Rs. {info['balance']:,.0f}", fontsize=8, color='#a8dadc', transform=fig.transFigure, zorder=11)
+        y_off -= 0.025
+        fig.text(0.79, y_off, f"PEAK: {info['max_dpd']} days", fontsize=9, fontweight='bold', color=info['color'], transform=fig.transFigure, zorder=11)
+        y_off -= 0.05
 
     plt.subplots_adjust(left=0.06, right=0.75, top=0.89, bottom=0.15)
-    
     buf = BytesIO()
     plt.savefig(buf, format='png', dpi=150, facecolor='#2b2b2b')
     plt.close()
     return buf.getvalue()
 
-# -------------------- METRICS ENGINE --------------------
-def build_excel_metrics(dpd_series, months):
-    dpd = dpd_series.values.astype(float)
-    metrics = [
-        ["Mean DPD", round(np.mean(dpd), 2), "Average delinquency"],
-        ["Max DPD", int(np.max(dpd)), "Worst performing month"],
-        ["Std Deviation", round(np.std(dpd, ddof=1), 2), "Volatility"],
-        ["Skewness", round(calc_skew(dpd), 2), "Right tail risk"],
-        ["Trend Slope", round(calc_trend_slope(dpd), 2), "Monthly change rate"],
-        ["Sticky Bucket", "90+" if np.max(dpd) >= 90 else "60+" if np.max(dpd) >= 60 else "30+" if np.max(dpd) >= 30 else "Current", "Worst bucket"]
-    ]
-    return pd.DataFrame(metrics, columns=["Metric", "Value", "Interpretation"])
-
+# -------------------- ORIGINAL ANALYSIS & SIMPLE CHART --------------------
 def analyze(row, months):
     dpd = row[months].astype(float).fillna(0)
     df = pd.DataFrame({"Month": months.astype(str), "DPD": dpd})
     df["Rolling_3M"] = df["DPD"].rolling(3).mean().fillna(0)
-    return df, dpd.max(), df.loc[df["DPD"].idxmax(), "Month"], {
-        "Mean DPD": round(np.mean(dpd), 2), "Max DPD": int(dpd.max()), "Trend": round(calc_trend_slope(dpd), 2)
-    }
+    max_dpd = dpd.max()
+    max_month = df.loc[df["DPD"].idxmax(), "Month"]
+    metrics = {"Mean DPD": round(np.mean(dpd), 2), "Max DPD": int(max_dpd), "Cumulative DPD": int(dpd.sum()),
+               "Trend Slope": round(calc_trend_slope(dpd), 2), 
+               "Sticky Bucket": "90+" if max_dpd >= 90 else "60+" if max_dpd >= 60 else "30+" if max_dpd >= 30 else "Current"}
+    return df, max_dpd, max_month, metrics
 
-def plot_simple_chart(df, max_dpd, max_month):
+def plot_chart(df, max_dpd, max_month):
     fig, ax = plt.subplots(figsize=(10, 3.5))
     ax.plot(df["Month"], df["DPD"], marker="o", linewidth=2, color="#3b82f6", label="DPD")
-    ax.plot(df["Month"], df["Rolling_3M"], "--", color="#8b5cf6", label="3M Avg")
+    ax.plot(df["Month"], df["Rolling_3M"], linestyle="--", linewidth=1.5, color="#8b5cf6", label="3M Rolling Avg")
+    ax.plot(max_month, max_dpd, "r*", markersize=16)
+    ax.text(max_month, max_dpd + 5, f"MAX {int(max_dpd)}", ha="center", color="red", fontweight="bold")
     ax.set_ylabel("DPD")
     ax.legend()
+    ax.grid(True, alpha=0.3)
     plt.xticks(rotation=45)
     plt.tight_layout()
     return fig
@@ -185,36 +251,21 @@ if check_password():
     <style>
     .main { background-color: #f8fafc; }
     [data-testid="stSidebar"] { background: linear-gradient(180deg, #1e293b 0%, #334155 100%); color: white; }
-    [data-testid="stSidebar"] * { color: white !important; }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] label, [data-testid="stSidebar"] p { color: white !important; }
     [data-testid="stSidebar"] .stDownloadButton button {
         width: 100%; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-        color: white !important; border: none; padding: 12px; border-radius: 8px;
+        color: white !important; font-weight: 600; border: none; padding: 12px; border-radius: 8px;
     }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] {
-        background-color: rgba(255, 255, 255, 0.05); border: 1px dashed rgba(255, 255, 255, 0.3);
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section {
-        background-color: rgba(30, 41, 59, 0.6) !important;
-        border: 1px dashed rgba(255, 255, 255, 0.3) !important;
-        border-radius: 8px;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] section button {
-        background-color: rgba(59, 130, 246, 0.8) !important;
-        color: white !important;
-        border: none !important;
-    }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] small {
-        color: rgba(255, 255, 255, 0.7) !important;
-    }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] { background-color: rgba(255, 255, 255, 0.05); border: 1px dashed rgba(255, 255, 255, 0.3); padding: 1rem; }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] button { color: #1e293b !important; background-color: white !important; }
     </style>
     """, unsafe_allow_html=True)
     
     with st.sidebar:
         st.markdown("# 🛡️ Risk Intelligence")
         st.markdown("---")
-        st.markdown("### 📁 Data Input")
         file = st.file_uploader("Upload Portfolio Excel", type=["xlsx"])
-        
+        st.markdown("---")
         if st.button("🚪 Logout", use_container_width=True):
             st.session_state.clear()
             st.rerun()
@@ -223,29 +274,27 @@ if check_password():
     
     if file:
         try:
-            # 1. Read Data
             raw = pd.read_excel(file)
             codes = raw.iloc[:, 0].unique()
             months = raw.columns[3:]
             
-            # 2. Process Infographic (PNG)
+            # Create PNG Chart Bytes
             with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
                 tmp.write(file.getvalue())
                 tmp_path = tmp.name
-            
-            with st.spinner("Generating High-Fidelity Infographic..."):
-                infographic_png = generate_delinquency_chart_bytes(tmp_path)
+            infographic_png = generate_delinquency_infographic(tmp_path)
             os.remove(tmp_path)
 
-            # 3. UI Layout
             excel_buf = BytesIO()
             with pd.ExcelWriter(excel_buf, engine="xlsxwriter") as writer:
                 tabs = st.tabs([f"Account {c}" for c in codes])
                 for tab, code in zip(tabs, codes):
                     row = raw[raw.iloc[:, 0] == code].iloc[0]
-                    df, max_v, max_m, metrics = analyze(row, months)
+                    df, max_dpd, max_month, metrics = analyze(row, months)
                     
+                    # ORIGINAL EXCEL CONTENT LOGIC
                     df.to_excel(writer, f"DATA_{code}", index=False)
+                    build_excel_metrics(df["DPD"], months).to_excel(writer, f"METRICS_{code}", index=False)
                     
                     with tab:
                         col1, col2 = st.columns([1, 2])
@@ -253,15 +302,15 @@ if check_password():
                             st.markdown("#### 📈 Key Metrics")
                             for k, v in metrics.items(): st.metric(k, v)
                         with col2:
-                            st.pyplot(plot_simple_chart(df, max_v, max_m))
+                            st.pyplot(plot_chart(df, max_dpd, max_month))
+                        st.markdown("#### 📋 Complete Risk Metrics")
                         st.dataframe(build_excel_metrics(df["DPD"], months), use_container_width=True, hide_index=True)
 
-            # 4. Downloads in Sidebar
             with st.sidebar:
                 st.markdown("### 💾 Downloads")
-                st.download_button("📊 Excel Report", excel_buf.getvalue(), "Risk_Metrics.xlsx", use_container_width=True)
+                st.download_button("📊 Excel Report", excel_buf.getvalue(), "Risk_Metrics_Report.xlsx", use_container_width=True)
                 st.write("")
-                st.download_button("🖼️ Infographic Chart (PNG)", infographic_png, "Delinquency_Infographic.png", "image/png", use_container_width=True)
+                st.download_button("🖼️ Infographic PNG", infographic_png, "Portfolio_Infographic.png", "image/png", use_container_width=True)
 
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
