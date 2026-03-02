@@ -35,19 +35,13 @@ def check_password():
     .stButton button {
         background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
         color: white; border: none; padding: 12px; font-weight: bold; border-radius: 8px; width: 100%;
-        transition: all 0.3s ease;
     }
-    .stButton button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
     [data-testid="stSidebar"] { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
     st.write("")
     st.write("")
-    st.write("")
-    st.write("")
-    st.write("")
-
     col1, col2, col3 = st.columns([1, 0.6, 1]) 
 
     with col2:
@@ -57,28 +51,23 @@ def check_password():
         username = st.text_input("Username", placeholder="Username", label_visibility="collapsed")
         password = st.text_input("Password", type="password", placeholder="Password", label_visibility="collapsed")
         
-        st.write("")
-        
         if st.button("Sign In", use_container_width=True):
             if username in st.secrets.get("passwords", {}) and password == st.secrets["passwords"][username]:
                 st.session_state.auth = True
                 st.rerun()
             else:
                 st.error("❌ Invalid credentials")
-        
         st.markdown("<div style='text-align: center; color: #94a3b8; font-size: 0.8rem; margin-top: 20px;'>🔒 Secure Enterprise Access</div>", unsafe_allow_html=True)
 
     return False
 
 # -------------------- ORIGINAL STAT FUNCTIONS --------------------
 def calc_skew(x):
-    m = np.mean(x)
-    s = np.std(x, ddof=1)
+    m, s = np.mean(x), np.std(x, ddof=1)
     return np.mean(((x - m) / s) ** 3) if s != 0 else 0
 
 def calc_kurtosis(x):
-    m = np.mean(x)
-    s = np.std(x, ddof=1)
+    m, s = np.mean(x), np.std(x, ddof=1)
     return np.mean(((x - m) / s) ** 4) if s != 0 else 0
 
 def calc_mode(x):
@@ -87,8 +76,7 @@ def calc_mode(x):
 
 def calc_trend_slope(y):
     x = np.arange(len(y))
-    x_mean = x.mean()
-    y_mean = y.mean()
+    x_mean, y_mean = x.mean(), y.mean()
     num = np.sum((x - x_mean) * (y - y_mean))
     den = np.sum((x - x_mean) ** 2)
     return num / den if den != 0 else 0
@@ -98,11 +86,7 @@ def calc_monthly_avg(dpd, months):
     month_data = {}
     for i, m in enumerate(months):
         month_str = str(m)
-        if '-' in month_str:
-            try: month_num = int(month_str.split('-')[1])
-            except: month_num = (i % 12) + 1
-        else:
-            month_num = (i % 12) + 1
+        month_num = int(month_str.split('-')[1]) if '-' in month_str and month_str.split('-')[1].isdigit() else (i % 12) + 1
         if month_num not in month_data: month_data[month_num] = []
         month_data[month_num].append(dpd[i])
     return {k: np.mean(v) for k, v in month_data.items()}
@@ -200,7 +184,7 @@ def generate_delinquency_infographic(excel_file_path):
     ax.set_xticklabels(month_columns, rotation=45, ha='right', fontsize=9, color='#a8dadc', fontweight='bold')
     ax.tick_params(axis='both', colors='#a8dadc')
 
-    # Panel
+    # Status Panel
     panel = Rectangle((0.77, 0.15), 0.21, 0.65, transform=fig.transFigure, facecolor='#0f0f0f', alpha=0.95, edgecolor='#00d4ff', linewidth=3, zorder=10)
     fig.add_artist(panel)
     fig.text(0.875, 0.77, 'PORTFOLIO STATUS', fontsize=14, fontweight='bold', color='white', ha='center', transform=fig.transFigure, zorder=11)
@@ -250,14 +234,36 @@ if check_password():
     st.markdown("""
     <style>
     .main { background-color: #f8fafc; }
-    [data-testid="stSidebar"] { background: linear-gradient(180deg, #1e293b 0%, #334155 100%); color: white; }
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] label, [data-testid="stSidebar"] p { color: white !important; }
-    [data-testid="stSidebar"] .stDownloadButton button {
-        width: 100%; background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-        color: white !important; font-weight: 600; border: none; padding: 12px; border-radius: 8px;
+    
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1e293b 0%, #334155 100%);
+        color: white;
     }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] { background-color: rgba(255, 255, 255, 0.05); border: 1px dashed rgba(255, 255, 255, 0.3); padding: 1rem; }
-    [data-testid="stSidebar"] [data-testid="stFileUploader"] button { color: #1e293b !important; background-color: white !important; }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] label, [data-testid="stSidebar"] p {
+        color: white !important;
+    }
+
+    /* DOWNLOAD BUTTONS AND LOGOUT BUTTON (Matched Blue Gradient) */
+    [data-testid="stSidebar"] .stDownloadButton button, [data-testid="stSidebar"] .stButton button {
+        width: 100%;
+        background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%) !important;
+        color: white !important;
+        font-weight: 600;
+        border: none;
+        padding: 12px;
+        border-radius: 8px;
+    }
+    
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] { 
+        background-color: rgba(255, 255, 255, 0.05); 
+        border: 1px dashed rgba(255, 255, 255, 0.3); 
+        padding: 1rem; 
+    }
+    [data-testid="stSidebar"] [data-testid="stFileUploader"] button { 
+        color: #1e293b !important; 
+        background-color: white !important; 
+    }
     </style>
     """, unsafe_allow_html=True)
     
@@ -278,7 +284,6 @@ if check_password():
             codes = raw.iloc[:, 0].unique()
             months = raw.columns[3:]
             
-            # Create PNG Chart Bytes
             with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
                 tmp.write(file.getvalue())
                 tmp_path = tmp.name
@@ -292,7 +297,6 @@ if check_password():
                     row = raw[raw.iloc[:, 0] == code].iloc[0]
                     df, max_dpd, max_month, metrics = analyze(row, months)
                     
-                    # ORIGINAL EXCEL CONTENT LOGIC
                     df.to_excel(writer, f"DATA_{code}", index=False)
                     build_excel_metrics(df["DPD"], months).to_excel(writer, f"METRICS_{code}", index=False)
                     
