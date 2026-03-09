@@ -130,9 +130,10 @@ def build_excel_metrics(dpd_series, months):
     
     dpd = valid_dpd.values.astype(float)
     
-    # Get corresponding months for valid data
-    valid_indices = valid_dpd.index
-    valid_months = [months[i] for i in valid_indices if i < len(months)]
+    # Get corresponding months for valid data - FIX HERE
+    valid_indices = valid_dpd.index.tolist()
+    months_list = months.tolist() if hasattr(months, 'tolist') else list(months)
+    valid_months = [months_list[i] for i in valid_indices if i < len(months_list)]
     
     seasonality_idx = calc_seasonality_index(dpd, valid_months)
     seasonal_strength = calc_seasonal_strength(dpd, valid_months)
