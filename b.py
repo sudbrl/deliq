@@ -226,7 +226,7 @@ def generate_delinquency_infographic(excel_file_path):
     for spine in ax.spines.values(): spine.set_visible(False)
     ax.set_xlabel('LOAN PERIOD', fontsize=15, fontweight='bold', color='#00d4ff', labelpad=15)
     ax.set_ylabel('DAYS PAST DUE (DPD)', fontsize=15, fontweight='bold', color='#00d4ff', labelpad=15)
-    fig.text(0.5, 0.96, 'LOAN DELINQUENCY INFOGRAPHIC', fontsize=24, fontweight='bold', color='white', ha='center')
+    fig.text(0.5, 0.96, 'LOAN DELINQUENCY HISTORY', fontsize=24, fontweight='bold', color='white', ha='center')
     ax.set_xticks(range(len(month_columns)))
     ax.set_xticklabels(month_columns, rotation=45, ha='right', fontsize=9, color='#a8dadc', fontweight='bold')
     ax.tick_params(axis='both', colors='#a8dadc')
@@ -399,3 +399,4 @@ if check_password():
             st.error(f"❌ Error: {str(e)}")
     else:
         st.info("👆 Please upload an Excel file in the sidebar to begin analysis")
+
