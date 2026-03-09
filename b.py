@@ -130,8 +130,10 @@ def build_excel_metrics(dpd_series, months):
     
     dpd = valid_dpd.values.astype(float)
     
-    # Get corresponding months for valid data - FIXED: valid_dpd already has months as index
-    valid_months = valid_dpd.index.tolist()
+    # Get corresponding months for valid data
+    valid_indices = valid_dpd.index.tolist()
+    months_list = months.tolist() if hasattr(months, 'tolist') else list(months)
+    valid_months = [months_list[i] for i in valid_indices if i < len(months_list)]
     
     seasonality_idx = calc_seasonality_index(dpd, valid_months)
     seasonal_strength = calc_seasonal_strength(dpd, valid_months)
@@ -296,8 +298,12 @@ def plot_chart(df, max_dpd, max_month):
     fig, ax = plt.subplots(figsize=(10, 3.5))
     ax.plot(df["Month"], df["DPD"], marker="o", linewidth=2, color="#3b82f6", label="DPD")
     ax.plot(df["Month"], df["Rolling_3M"], linestyle="--", linewidth=1.5, color="#8b5cf6", label="3M Rolling Avg")
-    ax.plot(max_month, max_dpd, "r*", markersize=16)
-    ax.text(max_month, max_dpd + 5, f"MAX {int(max_dpd)}", ha="center", color="red", fontweight="bold")
+    
+    # Only plot max marker if max_dpd > 0
+    if max_dpd > 0:
+        ax.plot(max_month, max_dpd, "r*", markersize=16)
+        ax.text(max_month, max_dpd + 5, f"MAX {int(max_dpd)}", ha="center", color="red", fontweight="bold")
+    
     ax.set_ylabel("DPD")
     ax.legend()
     ax.grid(True, alpha=0.3)
@@ -399,4 +405,3 @@ if check_password():
             st.error(f"❌ Error: {str(e)}")
     else:
         st.info("👆 Please upload an Excel file in the sidebar to begin analysis")
-
