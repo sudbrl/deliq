@@ -61,20 +61,37 @@ def check_password():
 
     return False
 
+# -------------------- HELPER FUNCTION TO FILTER VALID VALUES --------------------
+def filter_valid_dpd(dpd_series):
+    """Filter out #N/A and keep only numeric values (0 or more)"""
+    # Convert to numeric, coercing errors to NaN
+    numeric_series = pd.to_numeric(dpd_series, errors='coerce')
+    # Filter out NaN values and return valid data
+    valid_data = numeric_series[numeric_series.notna()]
+    return valid_data
+
 # -------------------- ORIGINAL STAT FUNCTIONS --------------------
 def calc_skew(x):
+    if len(x) == 0:
+        return 0
     m, s = np.mean(x), np.std(x, ddof=1)
     return np.mean(((x - m) / s) ** 3) if s != 0 else 0
 
 def calc_kurtosis(x):
+    if len(x) == 0:
+        return 0
     m, s = np.mean(x), np.std(x, ddof=1)
     return np.mean(((x - m) / s) ** 4) if s != 0 else 0
 
 def calc_mode(x):
+    if len(x) == 0:
+        return 0
     mode_result = pd.Series(x).mode()
     return mode_result.iloc[0] if len(mode_result) > 0 else 0
 
 def calc_trend_slope(y):
+    if len(y) == 0:
+        return 0
     x = np.arange(len(y))
     x_mean, y_mean = x.mean(), y.mean()
     num = np.sum((x - x_mean) * (y - y_mean))
@@ -102,11 +119,23 @@ def calc_seasonal_strength(dpd, months):
     values = list(monthly_avg.values())
     return np.std(values) / np.mean(values) if np.mean(values) > 0 else 0
 
-# -------------------- ORIGINAL METRICS ENGINE --------------------
+# -------------------- ORIGINAL METRICS ENGINE (MODIFIED TO HANDLE FILTERED DATA) --------------------
 def build_excel_metrics(dpd_series, months):
-    dpd = dpd_series.values.astype(float)
-    seasonality_idx = calc_seasonality_index(dpd, months)
-    seasonal_strength = calc_seasonal_strength(dpd, months)
+    # Filter valid DPD values
+    valid_dpd = filter_valid_dpd(dpd_series)
+    
+    if len(valid_dpd) == 0:
+        # Return empty metrics if no valid data
+        return pd.DataFrame([["No valid data", "", ""]], columns=["Metric", "Value", "Interpretation"])
+    
+    dpd = valid_dpd.values.astype(float)
+    
+    # Get corresponding months for valid data
+    valid_indices = valid_dpd.index
+    valid_months = [months[i] for i in valid_indices if i < len(months)]
+    
+    seasonality_idx = calc_seasonality_index(dpd, valid_months)
+    seasonal_strength = calc_seasonal_strength(dpd, valid_months)
     peak_month = max(seasonality_idx, key=seasonality_idx.get) if seasonality_idx else 0
     trough_month = min(seasonality_idx, key=seasonality_idx.get) if seasonality_idx else 0
     
@@ -139,7 +168,7 @@ def build_excel_metrics(dpd_series, months):
     ]
     return pd.DataFrame(metrics, columns=["Metric", "Value", "Interpretation"])
 
-# -------------------- INFOGRAPHIC CHART LOGIC --------------------
+# -------------------- INFOGRAPHIC CHART LOGIC (MODIFIED TO EXCLUDE #N/A) --------------------
 def generate_delinquency_infographic(excel_file_path):
     df = pd.read_excel(excel_file_path)
     month_columns = df.columns[3:].tolist()
@@ -155,25 +184,44 @@ def generate_delinquency_infographic(excel_file_path):
     for idx, (_, row) in enumerate(df.iterrows()):
         loan_type = row.iloc[0]
         balance = row.iloc[2]
-        dpd_values = [float(row[m]) if pd.notna(row[m]) else 0 for m in month_columns]
-        month_positions = list(range(len(month_columns)))
+        
+        # Filter valid DPD values (exclude #N/A)
+        dpd_raw = [row[m] for m in month_columns]
+        valid_data = []
+        valid_positions = []
+        valid_months = []
+        
+        for i, (m, dpd_val) in enumerate(zip(month_columns, dpd_raw)):
+            # Convert to numeric, skip if NaN or not numeric
+            numeric_val = pd.to_numeric(dpd_val, errors='coerce')
+            if pd.notna(numeric_val):
+                valid_data.append(float(numeric_val))
+                valid_positions.append(i)
+                valid_months.append(m)
+        
+        if not valid_data:
+            continue
         
         color = colors[idx % len(colors)]
-        if dpd_values:
-            for glow in [8, 6, 4, 2]:
-                ax.plot(month_positions, dpd_values, color=color, linewidth=glow, alpha=0.15, zorder=1)
-            
-            ax.plot(month_positions, dpd_values, color=color, linewidth=3, label=loan_type, marker='o', 
-                    markersize=5, markerfacecolor=color, markeredgecolor='#2b2b2b', markeredgewidth=2, zorder=3)
-            
-            max_dpd = max(dpd_values)
-            max_idx = dpd_values.index(max_dpd)
-            loan_info.append({'type': loan_type, 'balance': balance, 'max_dpd': int(max_dpd), 'max_month': month_columns[max_idx], 'color': color})
-            
-            ax.plot(max_idx, max_dpd, 'o', color=color, markersize=12, markeredgecolor='white', markeredgewidth=3, zorder=6)
-            ax.annotate(f'{int(max_dpd)} DAYS\n{month_columns[max_idx]}', xy=(max_idx, max_dpd), xytext=(20, 20), textcoords='offset points',
-                        fontsize=10, fontweight='bold', bbox=dict(boxstyle='round,pad=0.8', facecolor='#2b2b2b', alpha=0.95, edgecolor=color, linewidth=3),
-                        color=color, arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.2', color=color, lw=3), zorder=8)
+        
+        # Plot with glow effect
+        for glow in [8, 6, 4, 2]:
+            ax.plot(valid_positions, valid_data, color=color, linewidth=glow, alpha=0.15, zorder=1)
+        
+        ax.plot(valid_positions, valid_data, color=color, linewidth=3, label=loan_type, marker='o', 
+                markersize=5, markerfacecolor=color, markeredgecolor='#2b2b2b', markeredgewidth=2, zorder=3)
+        
+        max_dpd = max(valid_data)
+        max_idx_in_valid = valid_data.index(max_dpd)
+        max_position = valid_positions[max_idx_in_valid]
+        max_month_label = valid_months[max_idx_in_valid]
+        
+        loan_info.append({'type': loan_type, 'balance': balance, 'max_dpd': int(max_dpd), 'max_month': max_month_label, 'color': color})
+        
+        ax.plot(max_position, max_dpd, 'o', color=color, markersize=12, markeredgecolor='white', markeredgewidth=3, zorder=6)
+        ax.annotate(f'{int(max_dpd)} DAYS\n{max_month_label}', xy=(max_position, max_dpd), xytext=(20, 20), textcoords='offset points',
+                    fontsize=10, fontweight='bold', bbox=dict(boxstyle='round,pad=0.8', facecolor='#2b2b2b', alpha=0.95, edgecolor=color, linewidth=3),
+                    color=color, arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.2', color=color, lw=3), zorder=8)
 
     ax.grid(True, alpha=0.15, linestyle='-', linewidth=1.5, color='#00d4ff')
     for spine in ax.spines.values(): spine.set_visible(False)
@@ -204,19 +252,48 @@ def generate_delinquency_infographic(excel_file_path):
     plt.close()
     return buf.getvalue()
 
-# -------------------- ORIGINAL ANALYSIS & SIMPLE CHART --------------------
+# -------------------- ORIGINAL ANALYSIS & SIMPLE CHART (MODIFIED TO EXCLUDE #N/A) --------------------
 def analyze(row, months):
-    dpd = row[months].astype(float).fillna(0)
-    df = pd.DataFrame({"Month": months.astype(str), "DPD": dpd})
+    # Filter valid DPD values
+    dpd_raw = row[months]
+    dpd_numeric = pd.to_numeric(dpd_raw, errors='coerce')
+    
+    # Create dataframe with only valid data points
+    valid_mask = dpd_numeric.notna()
+    valid_months = months[valid_mask]
+    valid_dpd = dpd_numeric[valid_mask].astype(float)
+    
+    if len(valid_dpd) == 0:
+        # Return empty results if no valid data
+        df = pd.DataFrame({"Month": [], "DPD": [], "Rolling_3M": []})
+        return df, 0, "", {"Mean DPD": 0, "Max DPD": 0, "Cumulative DPD": 0, "Trend Slope": 0, "Sticky Bucket": "No Data"}
+    
+    df = pd.DataFrame({"Month": valid_months.astype(str), "DPD": valid_dpd.values})
     df["Rolling_3M"] = df["DPD"].rolling(3).mean().fillna(0)
-    max_dpd = dpd.max()
+    
+    max_dpd = valid_dpd.max()
     max_month = df.loc[df["DPD"].idxmax(), "Month"]
-    metrics = {"Mean DPD": round(np.mean(dpd), 2), "Max DPD": int(max_dpd), "Cumulative DPD": int(dpd.sum()),
-               "Trend Slope": round(calc_trend_slope(dpd), 2), 
-               "Sticky Bucket": "90+" if max_dpd >= 90 else "60+" if max_dpd >= 60 else "30+" if max_dpd >= 30 else "Current"}
+    
+    metrics = {
+        "Mean DPD": round(np.mean(valid_dpd), 2), 
+        "Max DPD": int(max_dpd), 
+        "Cumulative DPD": int(valid_dpd.sum()),
+        "Trend Slope": round(calc_trend_slope(valid_dpd.values), 2), 
+        "Sticky Bucket": "90+" if max_dpd >= 90 else "60+" if max_dpd >= 60 else "30+" if max_dpd >= 30 else "Current"
+    }
+    
     return df, max_dpd, max_month, metrics
 
 def plot_chart(df, max_dpd, max_month):
+    if len(df) == 0:
+        fig, ax = plt.subplots(figsize=(10, 3.5))
+        ax.text(0.5, 0.5, "No valid data to display", ha='center', va='center', fontsize=14)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis('off')
+        plt.tight_layout()
+        return fig
+    
     fig, ax = plt.subplots(figsize=(10, 3.5))
     ax.plot(df["Month"], df["DPD"], marker="o", linewidth=2, color="#3b82f6", label="DPD")
     ax.plot(df["Month"], df["Rolling_3M"], linestyle="--", linewidth=1.5, color="#8b5cf6", label="3M Rolling Avg")
@@ -298,7 +375,10 @@ if check_password():
                     df, max_dpd, max_month, metrics = analyze(row, months)
                     
                     df.to_excel(writer, f"DATA_{code}", index=False)
-                    build_excel_metrics(df["DPD"], months).to_excel(writer, f"METRICS_{code}", index=False)
+                    
+                    # Get valid DPD for metrics
+                    dpd_series = pd.to_numeric(row[months], errors='coerce')
+                    build_excel_metrics(dpd_series, months).to_excel(writer, f"METRICS_{code}", index=False)
                     
                     with tab:
                         col1, col2 = st.columns([1, 2])
@@ -308,7 +388,7 @@ if check_password():
                         with col2:
                             st.pyplot(plot_chart(df, max_dpd, max_month))
                         st.markdown("#### 📋 Complete Risk Metrics")
-                        st.dataframe(build_excel_metrics(df["DPD"], months), use_container_width=True, hide_index=True)
+                        st.dataframe(build_excel_metrics(dpd_series, months), use_container_width=True, hide_index=True)
 
             with st.sidebar:
                 st.markdown("### 💾 Downloads")
