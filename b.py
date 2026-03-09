@@ -119,7 +119,7 @@ def calc_seasonal_strength(dpd, months):
     values = list(monthly_avg.values())
     return np.std(values) / np.mean(values) if np.mean(values) > 0 else 0
 
-# -------------------- ORIGINAL METRICS ENGINE (MODIFIED TO HANDLE FILTERED DATA) --------------------
+# -------------------- ORIGINAL METRICS ENGINE (FIXED) --------------------
 def build_excel_metrics(dpd_series, months):
     # Filter valid DPD values
     valid_dpd = filter_valid_dpd(dpd_series)
@@ -130,10 +130,8 @@ def build_excel_metrics(dpd_series, months):
     
     dpd = valid_dpd.values.astype(float)
     
-    # Get corresponding months for valid data
-    valid_indices = valid_dpd.index.tolist()
-    months_list = months.tolist() if hasattr(months, 'tolist') else list(months)
-    valid_months = [months_list[i] for i in valid_indices if i < len(months_list)]
+    # FIX: The index already contains month names directly, no need for lookup
+    valid_months = valid_dpd.index.tolist()
     
     seasonality_idx = calc_seasonality_index(dpd, valid_months)
     seasonal_strength = calc_seasonal_strength(dpd, valid_months)
@@ -228,7 +226,7 @@ def generate_delinquency_infographic(excel_file_path):
     for spine in ax.spines.values(): spine.set_visible(False)
     ax.set_xlabel('LOAN PERIOD', fontsize=15, fontweight='bold', color='#00d4ff', labelpad=15)
     ax.set_ylabel('DAYS PAST DUE (DPD)', fontsize=15, fontweight='bold', color='#00d4ff', labelpad=15)
-    fig.text(0.5, 0.96, 'LOAN DELINQUENCY HISTORY', fontsize=24, fontweight='bold', color='white', ha='center')
+    fig.text(0.5, 0.96, 'LOAN DELINQUENCY INFOGRAPHIC', fontsize=24, fontweight='bold', color='white', ha='center')
     ax.set_xticks(range(len(month_columns)))
     ax.set_xticklabels(month_columns, rotation=45, ha='right', fontsize=9, color='#a8dadc', fontweight='bold')
     ax.tick_params(axis='both', colors='#a8dadc')
