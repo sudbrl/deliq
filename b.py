@@ -240,7 +240,7 @@ def generate_delinquency_infographic(excel_file_path):
     for info in loan_info:
         fig.text(0.79, y_off, f"● {info['type']}", fontsize=10, fontweight='bold', color=info['color'], transform=fig.transFigure, zorder=11)
         y_off -= 0.03
-        fig.text(0.79, y_off, f"BALANCE: Rs. {info['balance']:,.0f}", fontsize=8, color='#a8dadc', transform=fig.transFigure, zorder=11)
+        fig.text(0.79, y_off, f"BALANCE: Rs. {info['balance']:,.0f}", fontsize=10, fontweight='bold', color='#a8dadc', transform=fig.transFigure, zorder=11)
         y_off -= 0.025
         fig.text(0.79, y_off, f"PEAK: {info['max_dpd']} days", fontsize=9, fontweight='bold', color=info['color'], transform=fig.transFigure, zorder=11)
         y_off -= 0.05
@@ -403,4 +403,5 @@ if check_password():
             st.error(f"❌ Error: {str(e)}")
     else:
         st.info("👆 Please upload an Excel file in the sidebar to begin analysis")
+
 
